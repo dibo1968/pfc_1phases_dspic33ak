@@ -82,7 +82,9 @@
 /* LED1(LD2) : DIM:030 - Pin #55 : RP54/ASCL1/RD5 */
 #define LED1                    LATDbits.LATD5
 /* PFC Enable Signal:    DIM:008 : PIN 42 :  RP38/PWM4L/RC5 */
-#define PFC_ENABLE_SIGNAL       LATCbits.LATC5 
+#define PFC_ENABLE_SIGNAL       LATCbits.LATC5
+/* Inrush relay : PIN 36: RP40/RC7*/
+#define PFC_INRUSH_RELAY       LATCbits.LATC7        
 // </editor-fold>
 
 // <editor-fold defaultstate="expanded" desc="INTERFACE FUNCTIONS ">

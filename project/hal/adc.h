@@ -67,7 +67,8 @@
         
 #define ADCBUF_PFC_IL       (int16_t)(AD1CH1DATA - 2048)<<4 // Range Changed : -32767 to 32767
 #define ADCBUF_PFC_VAC      (int16_t)(AD2CH0DATA - 2048)<<4 // Range Changed : -32767 to 32767      
-#define ADCBUF_VDC          (uint16_t)(AD1CH0DATA)<<4    // Range Changed : 0 to 65535 
+#define ADCBUF_VDC          (uint16_t)(AD1CH0DATA)<<4    // Range Changed : 0 to 65535
+#define ADCBUF_PFC_IL2       (int16_t)(AD1CH7DATA - 2048)<<4 // Range Changed : -32767 to 32767        
 
 /* IL (AD1CH2) is the ADC Interrupt source */
 #define EnablePFCADCInterrupt()     _AD1CH1IE = 1
