@@ -98,11 +98,13 @@ void __attribute__((__interrupt__,no_auto_psv)) PFC_ADCInterrupt()
     /** Load ADC Buffer data to respective variables */
     pfcParam.pfcVoltage.outputVoltage       = ADCBUF_VDC>>1;
     pfcParam.pfcVoltage.acVoltage           = ADCBUF_PFC_VAC;
-    pfcParam.pfcCurrent.inductorCurrent     = ADCBUF_PFC_IL;     
+    pfcParam.pfcCurrent.inductorCurrent     = ADCBUF_PFC_IL;
+    pfcParam.pfcCurrent2.inductorCurrent     = ADCBUF_PFC_IL2;
     
     pfcParam.pfcVoltage.vdc  = (float)(pfcParam.pfcVoltage.outputVoltage*ADC_VOLTAGE_SCALE);
     pfcParam.pfcVoltage.vac  = (float)(pfcParam.pfcVoltage.acVoltage*ADC_VOLTAGE_SCALE);
-    pfcParam.pfcCurrent.iL   = (float)(pfcParam.pfcCurrent.inductorCurrent*ADC_CURRENT_SCALE); 
+    pfcParam.pfcCurrent.iL   = (float)(pfcParam.pfcCurrent.inductorCurrent*ADC_CURRENT_SCALE);
+    pfcParam.pfcCurrent2.iL   = (float)(pfcParam.pfcCurrent2.inductorCurrent*ADC_CURRENT_SCALE);
     
     
     PFC_StateMachine(&pfcParam);
@@ -143,6 +145,7 @@ void PFC_StateMachine(PFC_T *pfcData)
 {    
     uint16_t pfcState = pfcData->state;
     PFC_MEASURE_CURRENT_T *pCurrent = &pfcData->pfcCurrent;
+    PFC_MEASURE_CURRENT_T *pCurrent2 = &pfcData->pfcCurrent2;
     PFC_MEASURE_VOLTAGE_T *pVoltage = &pfcData->pfcVoltage;
     
     /** Calculate average of PFC output voltage (DC voltage) feedback 

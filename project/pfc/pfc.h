@@ -122,6 +122,7 @@ typedef struct
     PFC_PI_T piCurrent;
     PFC_CTRL_STATE_T state;
     PFC_MEASURE_CURRENT_T pfcCurrent;
+    PFC_MEASURE_CURRENT_T pfcCurrent2;
     PFC_MEASURE_VOLTAGE_T pfcVoltage;
     float iL;
     float rectifiedVac;

@@ -28,7 +28,7 @@ Command:
   --defsym=__MPLAB_BUILD=1 \
   --defsym=__MPLAB_DEBUG=1 \
   --defsym=__DEBUG=1 \
-  -Tp33AK128MC106.00003c30.00 \
+  -Tp33AK128MC106.00005a04.00 \
   --no-check-sections \
   --data-init \
   --pack-data \
@@ -98,12 +98,12 @@ Default Scalar Model: Small
 section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
 __ivt_0                   0x800004               0x47c           0x47c  (1148)
-.text                     0x800480               0x328           0x328  (808)
-.text                     0x8007a8              0x5be0          0x5be0  (23520)
-.dinit                    0x806388                0xfc            0xfc  (252)
-.text                     0x806484               0x394           0x394  (916)
+.text                     0x800480               0x34c           0x34c  (844)
+.text                     0x8007cc              0x5be0          0x5be0  (23520)
+.dinit                    0x8063ac                0xfc            0xfc  (252)
+.text                     0x8064a8               0x394           0x394  (916)
 
-                   Total "program" memory used (bytes):         0x6814  (26644) 20%
+                   Total "program" memory used (bytes):         0x6838  (26680) 20%
 
 
 "data" Memory  [Origin = 0x4000, Length = 0x4000]
@@ -111,12 +111,12 @@ __ivt_0                   0x800004               0x47c           0x47c  (1148)
 section                    address      alignment gaps    total length  (dec)
 -------                    -------      --------------    -------------------
 x2cscope_data_buf           0x4000                   0          0x1324  (4900)
-.nbss                       0x5324                   0           0x11c  (284)
-.ndata                      0x5440                   0             0x4  (4)
-.bss                        0x5444                   0          0x125c  (4700)
-.data                       0x66a0                   0            0x58  (88)
+.nbss                       0x5324                   0           0x130  (304)
+.ndata                      0x5454                   0             0x4  (4)
+.bss                        0x5458                   0          0x125c  (4700)
+.data                       0x66b4                   0            0x58  (88)
 
-                      Total "data" memory used (bytes):         0x26f8  (9976) 60%
+                      Total "data" memory used (bytes):         0x270c  (9996) 61%
 
 
 Dynamic Memory Usage
@@ -124,14 +124,14 @@ Dynamic Memory Usage
 region                     address                      maximum length  (dec)
 ------                     -------                      ---------------------
 heap                             0                                   0  (0)
-stack                       0x66f8                              0x1908  (6408)
+stack                       0x670c                              0x18f4  (6388)
 
-                        Maximum dynamic memory (bytes):         0x1908  (6408)
+                        Maximum dynamic memory (bytes):         0x18f4  (6388)
 
 
 Interrupt Handlers:
   0x8005c4 __AD1CH1Interrupt
-  0x8006d8 __T1Interrupt
+  0x8006fc __T1Interrupt
 
 
 Interrupt Vector Tables (IVTs):
@@ -145,32 +145,32 @@ External Symbols in Data Memory (by address):
 
                     0x5324                  _counter
                     0x5328                  _pfcParam
-                    0x5410                  _boardServiceISRCounter
-                    0x5414                  _buttonSpeedHalfDouble
-                    0x541c                  _buttonStartStop
-                    0x5440                  _TableStruct
-                    0x5444                  _ScopeArray
-                    0x6444                  _TheTableStruct
-                    0x65bc                  _TScope
-                    0x66a0                  _blockFunctionTable
-                    0x66d0                  _parameterIdTable
-                    0x66e0                  _compilationDate
-                    0x66f4                  ___dso_handle
+                    0x5424                  _boardServiceISRCounter
+                    0x5428                  _buttonSpeedHalfDouble
+                    0x5430                  _buttonStartStop
+                    0x5454                  _TableStruct
+                    0x5458                  _ScopeArray
+                    0x6458                  _TheTableStruct
+                    0x65d0                  _TScope
+                    0x66b4                  _blockFunctionTable
+                    0x66e4                  _parameterIdTable
+                    0x66f4                  _compilationDate
+                    0x6708                  ___dso_handle
 
 External Symbols in Data Memory (by name):
 
-                    0x5444                  _ScopeArray
-                    0x65bc                  _TScope
-                    0x5440                  _TableStruct
-                    0x6444                  _TheTableStruct
-                    0x66f4                  ___dso_handle
-                    0x66a0                  _blockFunctionTable
-                    0x5410                  _boardServiceISRCounter
-                    0x5414                  _buttonSpeedHalfDouble
-                    0x541c                  _buttonStartStop
-                    0x66e0                  _compilationDate
+                    0x5458                  _ScopeArray
+                    0x65d0                  _TScope
+                    0x5454                  _TableStruct
+                    0x6458                  _TheTableStruct
+                    0x6708                  ___dso_handle
+                    0x66b4                  _blockFunctionTable
+                    0x5424                  _boardServiceISRCounter
+                    0x5428                  _buttonSpeedHalfDouble
+                    0x5430                  _buttonStartStop
+                    0x66f4                  _compilationDate
                     0x5324                  _counter
-                    0x66d0                  _parameterIdTable
+                    0x66e4                  _parameterIdTable
                     0x5328                  _pfcParam
 
 External Symbols in Program Memory (by address):
@@ -182,166 +182,166 @@ External Symbols in Program Memory (by address):
                   0x800560                  __data_init_extended
                   0x800560                  __data_init
                   0x8005c4                  __AD1CH1Interrupt
-                  0x8006d8                  __T1Interrupt
-                  0x800734                  __DefaultInterrupt
-                  0x80073c                  ___delay32
-                  0x800750                  __ctor
-                  0x800784                  __dtor
-                  0x8007a8                  _Scope_Main_Init
-                  0x800914                  _Scope_Main_Update
-                  0x800dd4                  _Scope_Main_Load
-                  0x8011c0                  _Scope_Main_Save
-                  0x802124                  _Scope_Main_GetAddress
-                  0x802cb0                  _sendSvNotAvailable
-                  0x802cf4                  _sendError
-                  0x8038f4                  _initServiceTable
-                  0x803948                  _addCoreServices
-                  0x804588                  _initLNet
-                  0x8045e8                  _addBlockServices
-                  0x804630                  _addExtendedBlockServices
-                  0x804658                  _putRAMBlock
-                  0x8049fc                  _getRAMBlock
-                  0x804d3c                  _putBlockData
-                  0x804eb4                  _getBlockData
-                  0x80523c                  _PFC_StateMachine
-                  0x805600                  _PFC_ServiceInit
-                  0x80561c                  _InitOscillator
-                  0x8058a8                  _Common_Init
-                  0x8058b8                  _Common_Update
-                  0x8058c8                  _Common_Load
-                  0x8058dc                  _Common_Save
-                  0x805910                  _Common_GetAddress
-                  0x805924                  _getAbsValI8
-                  0x805968                  _getAbsValI16
-                  0x8059ac                  _getAbsValI32
-                  0x8059f8                  _getAbsValI64
-                  0x805a68                  _getAbsValR32
-                  0x805a94                  _getAbsValR64
-                  0x805ad4                  _InitPWMGenerator4
-                  0x805c64                  _InitPWMGenerators
-                  0x805ce4                  _X2CScope_Initialise
-                  0x805d80                  _X2CScope_Communicate
-                  0x805d9c                  _X2CScope_Update
-                  0x805dac                  _X2CScope_HookUARTFunctions
-                  0x805de4                  _sendSerialWrapper
-                  0x805e04                  _receiveSerialWrapper
-                  0x805e18                  _isReceiveDataAvailableWrapper
-                  0x805e2c                  _isSendReadyWrapper
-                  0x805e40                  _initSerial
-                  0x805eec                  _IsPressed_Button1
-                  0x805f00                  _IsPressed_Button2
-                  0x805f14                  _BoardServiceStepIsr
-                  0x805f2c                  _BoardService
-                  0x805f6c                  _BoardServiceInit
-                  0x805f7c                  _HAL_InitPeripherals
-                  0x805fe4                  _HAL_PFCPWMDisableOutputs
-                  0x805ff8                  _HAL_PFCPWMEnableOutputs
-                  0x806004                  _ClearPWMPCIFault
-                  0x80600c                  _UART1_Initialize
-                  0x806140                  _InitializeADCs
-                  0x806270                  _initTableStruct
-                  0x806340                  _addTableStructProtocol
-                  0x806484                  _initSerialGeneric
-                  0x8064dc                  _linkSerial
-                  0x806560                  _MapGPIOHWFunction
-                  0x8065c0                  _SetupGPIOPorts
-                  0x806634                  _DiagnosticsStepMain
-                  0x80663c                  _DiagnosticsStepIsr
-                  0x806644                  _X2CScope_Init
-                  0x806668                  _DiagnosticsInit
-                  0x806698                  _PFC_MeasureCurrentInit
-                  0x8066b4                  _PFC_MeasureCurrentOffset
-                  0x806708                  _PFC_ControllerPIUpdate
-                  0x806764                  _TIMER1_Initialize
-                  0x80679c                  _initVersionInfo
-                  0x8067c8                  _main
-                  0x8067f0                  _X2C_Init
-                  0x806804                  _X2C_Update
+                  0x8006fc                  __T1Interrupt
+                  0x800758                  __DefaultInterrupt
+                  0x800760                  ___delay32
+                  0x800774                  __ctor
+                  0x8007a8                  __dtor
+                  0x8007cc                  _Scope_Main_Init
+                  0x800938                  _Scope_Main_Update
+                  0x800df8                  _Scope_Main_Load
+                  0x8011e4                  _Scope_Main_Save
+                  0x802148                  _Scope_Main_GetAddress
+                  0x802cd4                  _sendSvNotAvailable
+                  0x802d18                  _sendError
+                  0x803918                  _initServiceTable
+                  0x80396c                  _addCoreServices
+                  0x8045ac                  _initLNet
+                  0x80460c                  _addBlockServices
+                  0x804654                  _addExtendedBlockServices
+                  0x80467c                  _putRAMBlock
+                  0x804a20                  _getRAMBlock
+                  0x804d60                  _putBlockData
+                  0x804ed8                  _getBlockData
+                  0x805260                  _PFC_StateMachine
+                  0x805624                  _PFC_ServiceInit
+                  0x805640                  _InitOscillator
+                  0x8058cc                  _Common_Init
+                  0x8058dc                  _Common_Update
+                  0x8058ec                  _Common_Load
+                  0x805900                  _Common_Save
+                  0x805934                  _Common_GetAddress
+                  0x805948                  _getAbsValI8
+                  0x80598c                  _getAbsValI16
+                  0x8059d0                  _getAbsValI32
+                  0x805a1c                  _getAbsValI64
+                  0x805a8c                  _getAbsValR32
+                  0x805ab8                  _getAbsValR64
+                  0x805af8                  _InitPWMGenerator4
+                  0x805c88                  _InitPWMGenerators
+                  0x805d08                  _X2CScope_Initialise
+                  0x805da4                  _X2CScope_Communicate
+                  0x805dc0                  _X2CScope_Update
+                  0x805dd0                  _X2CScope_HookUARTFunctions
+                  0x805e08                  _sendSerialWrapper
+                  0x805e28                  _receiveSerialWrapper
+                  0x805e3c                  _isReceiveDataAvailableWrapper
+                  0x805e50                  _isSendReadyWrapper
+                  0x805e64                  _initSerial
+                  0x805f10                  _IsPressed_Button1
+                  0x805f24                  _IsPressed_Button2
+                  0x805f38                  _BoardServiceStepIsr
+                  0x805f50                  _BoardService
+                  0x805f90                  _BoardServiceInit
+                  0x805fa0                  _HAL_InitPeripherals
+                  0x806008                  _HAL_PFCPWMDisableOutputs
+                  0x80601c                  _HAL_PFCPWMEnableOutputs
+                  0x806028                  _ClearPWMPCIFault
+                  0x806030                  _UART1_Initialize
+                  0x806164                  _InitializeADCs
+                  0x806294                  _initTableStruct
+                  0x806364                  _addTableStructProtocol
+                  0x8064a8                  _initSerialGeneric
+                  0x806500                  _linkSerial
+                  0x806584                  _MapGPIOHWFunction
+                  0x8065e4                  _SetupGPIOPorts
+                  0x806658                  _DiagnosticsStepMain
+                  0x806660                  _DiagnosticsStepIsr
+                  0x806668                  _X2CScope_Init
+                  0x80668c                  _DiagnosticsInit
+                  0x8066bc                  _PFC_MeasureCurrentInit
+                  0x8066d8                  _PFC_MeasureCurrentOffset
+                  0x80672c                  _PFC_ControllerPIUpdate
+                  0x806788                  _TIMER1_Initialize
+                  0x8067c0                  _initVersionInfo
+                  0x8067ec                  _main
+                  0x806814                  _X2C_Init
+                  0x806828                  _X2C_Update
 
 External Symbols in Program Memory (by name):
 
-                  0x805f2c                  _BoardService
-                  0x805f6c                  _BoardServiceInit
-                  0x805f14                  _BoardServiceStepIsr
-                  0x806004                  _ClearPWMPCIFault
-                  0x805910                  _Common_GetAddress
-                  0x8058a8                  _Common_Init
-                  0x8058c8                  _Common_Load
-                  0x8058dc                  _Common_Save
-                  0x8058b8                  _Common_Update
-                  0x806668                  _DiagnosticsInit
-                  0x80663c                  _DiagnosticsStepIsr
-                  0x806634                  _DiagnosticsStepMain
-                  0x805f7c                  _HAL_InitPeripherals
-                  0x805fe4                  _HAL_PFCPWMDisableOutputs
-                  0x805ff8                  _HAL_PFCPWMEnableOutputs
-                  0x80561c                  _InitOscillator
-                  0x805ad4                  _InitPWMGenerator4
-                  0x805c64                  _InitPWMGenerators
-                  0x806140                  _InitializeADCs
-                  0x805eec                  _IsPressed_Button1
-                  0x805f00                  _IsPressed_Button2
-                  0x806560                  _MapGPIOHWFunction
-                  0x806708                  _PFC_ControllerPIUpdate
-                  0x806698                  _PFC_MeasureCurrentInit
-                  0x8066b4                  _PFC_MeasureCurrentOffset
-                  0x805600                  _PFC_ServiceInit
-                  0x80523c                  _PFC_StateMachine
-                  0x802124                  _Scope_Main_GetAddress
-                  0x8007a8                  _Scope_Main_Init
-                  0x800dd4                  _Scope_Main_Load
-                  0x8011c0                  _Scope_Main_Save
-                  0x800914                  _Scope_Main_Update
-                  0x8065c0                  _SetupGPIOPorts
-                  0x806764                  _TIMER1_Initialize
-                  0x80600c                  _UART1_Initialize
-                  0x805d80                  _X2CScope_Communicate
-                  0x805dac                  _X2CScope_HookUARTFunctions
-                  0x806644                  _X2CScope_Init
-                  0x805ce4                  _X2CScope_Initialise
-                  0x805d9c                  _X2CScope_Update
-                  0x8067f0                  _X2C_Init
-                  0x806804                  _X2C_Update
+                  0x805f50                  _BoardService
+                  0x805f90                  _BoardServiceInit
+                  0x805f38                  _BoardServiceStepIsr
+                  0x806028                  _ClearPWMPCIFault
+                  0x805934                  _Common_GetAddress
+                  0x8058cc                  _Common_Init
+                  0x8058ec                  _Common_Load
+                  0x805900                  _Common_Save
+                  0x8058dc                  _Common_Update
+                  0x80668c                  _DiagnosticsInit
+                  0x806660                  _DiagnosticsStepIsr
+                  0x806658                  _DiagnosticsStepMain
+                  0x805fa0                  _HAL_InitPeripherals
+                  0x806008                  _HAL_PFCPWMDisableOutputs
+                  0x80601c                  _HAL_PFCPWMEnableOutputs
+                  0x805640                  _InitOscillator
+                  0x805af8                  _InitPWMGenerator4
+                  0x805c88                  _InitPWMGenerators
+                  0x806164                  _InitializeADCs
+                  0x805f10                  _IsPressed_Button1
+                  0x805f24                  _IsPressed_Button2
+                  0x806584                  _MapGPIOHWFunction
+                  0x80672c                  _PFC_ControllerPIUpdate
+                  0x8066bc                  _PFC_MeasureCurrentInit
+                  0x8066d8                  _PFC_MeasureCurrentOffset
+                  0x805624                  _PFC_ServiceInit
+                  0x805260                  _PFC_StateMachine
+                  0x802148                  _Scope_Main_GetAddress
+                  0x8007cc                  _Scope_Main_Init
+                  0x800df8                  _Scope_Main_Load
+                  0x8011e4                  _Scope_Main_Save
+                  0x800938                  _Scope_Main_Update
+                  0x8065e4                  _SetupGPIOPorts
+                  0x806788                  _TIMER1_Initialize
+                  0x806030                  _UART1_Initialize
+                  0x805da4                  _X2CScope_Communicate
+                  0x805dd0                  _X2CScope_HookUARTFunctions
+                  0x806668                  _X2CScope_Init
+                  0x805d08                  _X2CScope_Initialise
+                  0x805dc0                  _X2CScope_Update
+                  0x806814                  _X2C_Init
+                  0x806828                  _X2C_Update
                   0x8005c4                  __AD1CH1Interrupt
-                  0x800734                  __DefaultInterrupt
-                  0x8006d8                  __T1Interrupt
-                  0x80073c                  ___delay32
+                  0x800758                  __DefaultInterrupt
+                  0x8006fc                  __T1Interrupt
+                  0x800760                  ___delay32
                   0x80055c                  ___tls_crt_init
                   0x80055c                  __crt_return_stmt
-                  0x800750                  __ctor
+                  0x800774                  __ctor
                   0x800560                  __data_init
                   0x800560                  __data_init_extended
-                  0x800784                  __dtor
+                  0x8007a8                  __dtor
                   0x800004                  __ivt_0
                   0x800480                  __resetPRI
-                  0x8045e8                  _addBlockServices
-                  0x803948                  _addCoreServices
-                  0x804630                  _addExtendedBlockServices
-                  0x806340                  _addTableStructProtocol
-                  0x805968                  _getAbsValI16
-                  0x8059ac                  _getAbsValI32
-                  0x8059f8                  _getAbsValI64
-                  0x805924                  _getAbsValI8
-                  0x805a68                  _getAbsValR32
-                  0x805a94                  _getAbsValR64
-                  0x804eb4                  _getBlockData
-                  0x8049fc                  _getRAMBlock
-                  0x804588                  _initLNet
-                  0x805e40                  _initSerial
-                  0x806484                  _initSerialGeneric
-                  0x8038f4                  _initServiceTable
-                  0x806270                  _initTableStruct
-                  0x80679c                  _initVersionInfo
-                  0x805e18                  _isReceiveDataAvailableWrapper
-                  0x805e2c                  _isSendReadyWrapper
-                  0x8064dc                  _linkSerial
-                  0x8067c8                  _main
-                  0x804d3c                  _putBlockData
-                  0x804658                  _putRAMBlock
-                  0x805e04                  _receiveSerialWrapper
-                  0x802cf4                  _sendError
-                  0x805de4                  _sendSerialWrapper
-                  0x802cb0                  _sendSvNotAvailable
+                  0x80460c                  _addBlockServices
+                  0x80396c                  _addCoreServices
+                  0x804654                  _addExtendedBlockServices
+                  0x806364                  _addTableStructProtocol
+                  0x80598c                  _getAbsValI16
+                  0x8059d0                  _getAbsValI32
+                  0x805a1c                  _getAbsValI64
+                  0x805948                  _getAbsValI8
+                  0x805a8c                  _getAbsValR32
+                  0x805ab8                  _getAbsValR64
+                  0x804ed8                  _getBlockData
+                  0x804a20                  _getRAMBlock
+                  0x8045ac                  _initLNet
+                  0x805e64                  _initSerial
+                  0x8064a8                  _initSerialGeneric
+                  0x803918                  _initServiceTable
+                  0x806294                  _initTableStruct
+                  0x8067c0                  _initVersionInfo
+                  0x805e3c                  _isReceiveDataAvailableWrapper
+                  0x805e50                  _isSendReadyWrapper
+                  0x806500                  _linkSerial
+                  0x8067ec                  _main
+                  0x804d60                  _putBlockData
+                  0x80467c                  _putRAMBlock
+                  0x805e28                  _receiveSerialWrapper
+                  0x802d18                  _sendError
+                  0x805e08                  _sendSerialWrapper
+                  0x802cd4                  _sendSvNotAvailable
 
 
 #pragma config definitions maximum
@@ -701,7 +701,7 @@ LOAD c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libfx-elf.a
 .reset            0x800000          0x4
                   0x800000          0x4 LONG 0x800480 ABSOLUTE (__reset)
 
-.text             0x800480        0x328
+.text             0x800480        0x34c
  *(.init)
  .init            0x800480         0xe0 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt0_extendedaa.o)
                   0x800480                  __reset
@@ -714,25 +714,25 @@ LOAD c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libfx-elf.a
  *(.user_init)
  *(.handle)
  *(.isr*)
- .isr.isr.text    0x8005c4        0x114 build/default/debug/_ext/1360933982/pfc.o
+ .isr.isr.text    0x8005c4        0x138 build/default/debug/_ext/1360933982/pfc.o
                   0x8005c4                  __AD1CH1Interrupt
- .isr.isr.text    0x8006d8         0x5c build/default/debug/_ext/1472/main.o
-                  0x8006d8                  __T1Interrupt
- .isr             0x800734          0x8 default_isr
-                  0x800734                  __DefaultInterrupt
+ .isr.isr.text    0x8006fc         0x5c build/default/debug/_ext/1472/main.o
+                  0x8006fc                  __T1Interrupt
+ .isr             0x800758          0x8 default_isr
+                  0x800758                  __DefaultInterrupt
  *(.libc)
- .libc            0x80073c         0x10 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(delay32.AAMeo)
-                  0x80073c                  ___delay32
+ .libc            0x800760         0x10 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(delay32.AAMeo)
+                  0x800760                  ___delay32
  *(.libm)
  *(.libdsp)
  *(.lib*)
  .libpic30_crt_start_mode
-                  0x80074c          0x4 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt_start_mode_normal.AAMeo)
-                  0x80074c                  __crt_start_mode
-                  0x80074c                  __crt_start_mode_normal
- .lib.ctor        0x800750         0x58 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt_ctor.aa.AAMeo)
-                  0x800750                  __ctor
-                  0x800784                  __dtor
+                  0x800770          0x4 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt_start_mode_normal.AAMeo)
+                  0x800770                  __crt_start_mode
+                  0x800770                  __crt_start_mode_normal
+ .lib.ctor        0x800774         0x58 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt_ctor.aa.AAMeo)
+                  0x800774                  __ctor
+                  0x8007a8                  __dtor
 
 usercode
  *(usercode)
@@ -862,7 +862,7 @@ __FWPUCB
  .comment           0x076c         0x58 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
  .comment           0x07c4         0x58 ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
 
-.debug_info         0x0000      0x11746
+.debug_info         0x0000      0x1178a
  *(.debug_info)
  .debug_info        0x0000       0x1059 build/default/debug/_ext/1360926148/adc.o
  .debug_info        0x1059       0x1721 build/default/debug/_ext/1360926148/board_service.o
@@ -871,21 +871,21 @@ __FWPUCB
  .debug_info        0x43a6       0x1100 build/default/debug/_ext/1360926148/pwm.o
  .debug_info        0x54a6        0x8aa build/default/debug/_ext/1360926148/uart1.o
  .debug_info        0x5d50        0x89c build/default/debug/_ext/1360926148/timer1.o
- .debug_info        0x65ec       0x126c build/default/debug/_ext/1360933982/pfc.o
- .debug_info        0x7858        0x32a build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_info        0x7b82        0x33c build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_info        0x7ebe       0x11ca build/default/debug/_ext/1798147462/diagnostics.o
- .debug_info        0x9088        0x713 build/default/debug/_ext/1472/main.o
- .debug_info        0x979b       0x1184 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
- .debug_info        0xa91f        0xf17 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
- .debug_info        0xb836       0x1089 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
- .debug_info        0xc8bf        0x5ea ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
- .debug_info        0xcea9        0xf61 ..\x2cscope\X2CScopeLib.X.a(Services.o)
- .debug_info        0xde0a        0xbff ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
- .debug_info        0xea09        0xc22 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
- .debug_info        0xf62b        0x7ea ..\x2cscope\X2CScopeLib.X.a(X2C.o)
- .debug_info        0xfe15       0x1392 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
- .debug_info        0x111a7        0x59f ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
+ .debug_info        0x65ec       0x12b0 build/default/debug/_ext/1360933982/pfc.o
+ .debug_info        0x789c        0x32a build/default/debug/_ext/1360933982/pfc_measure.o
+ .debug_info        0x7bc6        0x33c build/default/debug/_ext/1360933982/pfc_pi.o
+ .debug_info        0x7f02       0x11ca build/default/debug/_ext/1798147462/diagnostics.o
+ .debug_info        0x90cc        0x713 build/default/debug/_ext/1472/main.o
+ .debug_info        0x97df       0x1184 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
+ .debug_info        0xa963        0xf17 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
+ .debug_info        0xb87a       0x1089 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
+ .debug_info        0xc903        0x5ea ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
+ .debug_info        0xceed        0xf61 ..\x2cscope\X2CScopeLib.X.a(Services.o)
+ .debug_info        0xde4e        0xbff ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
+ .debug_info        0xea4d        0xc22 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
+ .debug_info        0xf66f        0x7ea ..\x2cscope\X2CScopeLib.X.a(X2C.o)
+ .debug_info        0xfe59       0x1392 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
+ .debug_info        0x111eb        0x59f ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
  *(.gnu.linkonce.wi.*)
 
 .debug_abbrev       0x0000       0x1d6a
@@ -913,7 +913,7 @@ __FWPUCB
  .debug_abbrev      0x1a08        0x284 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
  .debug_abbrev      0x1c8c         0xde ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
 
-.debug_line         0x0000       0x406f
+.debug_line         0x0000       0x4086
  *(.debug_line)
  .debug_line        0x0000        0x21c build/default/debug/_ext/1360926148/adc.o
  .debug_line        0x021c        0x392 build/default/debug/_ext/1360926148/board_service.o
@@ -923,21 +923,21 @@ __FWPUCB
  .debug_line        0x0f4a        0x324 build/default/debug/_ext/1360926148/uart1.o
  .debug_line        0x126e        0x191 build/default/debug/_ext/1360926148/timer1.o
  .debug_line        0x13ff          0x0 build/default/debug/_ext/1360926148/device_config.o
- .debug_line        0x13ff        0x69f build/default/debug/_ext/1360933982/pfc.o
- .debug_line        0x1a9e         0xfd build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_line        0x1b9b         0xab build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_line        0x1c46        0x249 build/default/debug/_ext/1798147462/diagnostics.o
- .debug_line        0x1e8f        0x1c0 build/default/debug/_ext/1472/main.o
- .debug_line        0x204f        0x17e ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
- .debug_line        0x21cd        0x45e ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
- .debug_line        0x262b        0x400 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
- .debug_line        0x2a2b        0x110 ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
- .debug_line        0x2b3b        0x60a ..\x2cscope\X2CScopeLib.X.a(Services.o)
- .debug_line        0x3145        0x12f ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
- .debug_line        0x3274         0xc8 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
- .debug_line        0x333c         0xcd ..\x2cscope\X2CScopeLib.X.a(X2C.o)
- .debug_line        0x3409        0xb27 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
- .debug_line        0x3f30        0x13f ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
+ .debug_line        0x13ff        0x6b6 build/default/debug/_ext/1360933982/pfc.o
+ .debug_line        0x1ab5         0xfd build/default/debug/_ext/1360933982/pfc_measure.o
+ .debug_line        0x1bb2         0xab build/default/debug/_ext/1360933982/pfc_pi.o
+ .debug_line        0x1c5d        0x249 build/default/debug/_ext/1798147462/diagnostics.o
+ .debug_line        0x1ea6        0x1c0 build/default/debug/_ext/1472/main.o
+ .debug_line        0x2066        0x17e ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
+ .debug_line        0x21e4        0x45e ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
+ .debug_line        0x2642        0x400 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
+ .debug_line        0x2a42        0x110 ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
+ .debug_line        0x2b52        0x60a ..\x2cscope\X2CScopeLib.X.a(Services.o)
+ .debug_line        0x315c        0x12f ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
+ .debug_line        0x328b         0xc8 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
+ .debug_line        0x3353         0xcd ..\x2cscope\X2CScopeLib.X.a(X2C.o)
+ .debug_line        0x3420        0xb27 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
+ .debug_line        0x3f47        0x13f ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
 
 .debug_frame        0x0000        0xb40
  *(.debug_frame)
@@ -990,22 +990,22 @@ __FWPUCB
  .debug_str         0x050e         0x83 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
  .debug_str         0x0591         0x16 ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
 
-.debug_loc          0x0000        0xbd7
+.debug_loc          0x0000        0xc1a
  *(.debug_loc)
  .debug_loc         0x0000         0x64 build/default/debug/_ext/1360926148/board_service.o
- .debug_loc         0x0064        0x2a6 build/default/debug/_ext/1360933982/pfc.o
- .debug_loc         0x030a         0x40 build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_loc         0x034a         0x2d build/default/debug/_ext/1798147462/diagnostics.o
- .debug_loc         0x0377        0x120 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
- .debug_loc         0x0497         0xc0 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
- .debug_loc         0x0557        0x100 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
- .debug_loc         0x0657        0x100 ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
- .debug_loc         0x0757        0x140 ..\x2cscope\X2CScopeLib.X.a(Services.o)
- .debug_loc         0x0897         0x40 ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
- .debug_loc         0x08d7         0x20 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
- .debug_loc         0x08f7         0x40 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
- .debug_loc         0x0937        0x140 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
- .debug_loc         0x0a77        0x160 ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
+ .debug_loc         0x0064        0x2e9 build/default/debug/_ext/1360933982/pfc.o
+ .debug_loc         0x034d         0x40 build/default/debug/_ext/1360933982/pfc_measure.o
+ .debug_loc         0x038d         0x2d build/default/debug/_ext/1798147462/diagnostics.o
+ .debug_loc         0x03ba        0x120 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
+ .debug_loc         0x04da         0xc0 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
+ .debug_loc         0x059a        0x100 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
+ .debug_loc         0x069a        0x100 ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
+ .debug_loc         0x079a        0x140 ..\x2cscope\X2CScopeLib.X.a(Services.o)
+ .debug_loc         0x08da         0x40 ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
+ .debug_loc         0x091a         0x20 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
+ .debug_loc         0x093a         0x40 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
+ .debug_loc         0x097a        0x140 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
+ .debug_loc         0x0aba        0x160 ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
 
 .debug_macinfo
  *(.debug_macinfo)
@@ -3974,38 +3974,38 @@ x2cscope_data_buf
  x2cscope_data_buf
                     0x4000       0x1324 build/default/debug/_ext/1798147462/diagnostics.o
 
-.nbss               0x5324        0x11c
- .nbss              0x5324         0xec build/default/debug/_ext/1360933982/pfc.o
+.nbss               0x5324        0x130
+ .nbss              0x5324        0x100 build/default/debug/_ext/1360933982/pfc.o
                     0x5324                  _counter
                     0x5328                  _pfcParam
- .nbss              0x5410         0x14 build/default/debug/_ext/1360926148/board_service.o
-                    0x5410                  _boardServiceISRCounter
-                    0x5414                  _buttonSpeedHalfDouble
-                    0x541c                  _buttonStartStop
- .nbss              0x5424         0x10 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
- .nbss              0x5434          0xc ..\x2cscope\X2CScopeLib.X.a(LNet.o)
+ .nbss              0x5424         0x14 build/default/debug/_ext/1360926148/board_service.o
+                    0x5424                  _boardServiceISRCounter
+                    0x5428                  _buttonSpeedHalfDouble
+                    0x5430                  _buttonStartStop
+ .nbss              0x5438         0x10 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
+ .nbss              0x5448          0xc ..\x2cscope\X2CScopeLib.X.a(LNet.o)
 
-.ndata              0x5440          0x4
- .ndata             0x5440          0x4 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
-                    0x5440                  _TableStruct
+.ndata              0x5454          0x4
+ .ndata             0x5454          0x4 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
+                    0x5454                  _TableStruct
 
-.bss                0x5444       0x125c
- .bss               0x5444       0x1000 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
-                    0x5444                  _ScopeArray
- .bss               0x6444        0x178 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
-                    0x6444                  _TheTableStruct
- .bss               0x65bc         0x78 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
-                    0x65bc                  _TScope
- .bss               0x6634         0x6c ..\x2cscope\X2CScopeLib.X.a(Services.o)
+.bss                0x5458       0x125c
+ .bss               0x5458       0x1000 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
+                    0x5458                  _ScopeArray
+ .bss               0x6458        0x178 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
+                    0x6458                  _TheTableStruct
+ .bss               0x65d0         0x78 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
+                    0x65d0                  _TScope
+ .bss               0x6648         0x6c ..\x2cscope\X2CScopeLib.X.a(Services.o)
 
-.data               0x66a0         0x58
- .data              0x66a0         0x40 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
-                    0x66a0                  _blockFunctionTable
-                    0x66d0                  _parameterIdTable
- .data              0x66e0         0x14 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
-                    0x66e0                  _compilationDate
- .data              0x66f4          0x4 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt_ctor.aa.AAMeo)
-                    0x66f4                  ___dso_handle
+.data               0x66b4         0x58
+ .data              0x66b4         0x40 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
+                    0x66b4                  _blockFunctionTable
+                    0x66e4                  _parameterIdTable
+ .data              0x66f4         0x14 ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
+                    0x66f4                  _compilationDate
+ .data              0x6708          0x4 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt_ctor.aa.AAMeo)
+                    0x6708                  ___dso_handle
 
 __ivt_0           0x800004        0x47c
  __ivt_0          0x800004        0x47c __ivt_0
@@ -4331,101 +4331,101 @@ __ivt_0           0x800004        0x47c
  .config_BKUP_WPUCA
                   0x7f3800          0x4 build/default/debug/_ext/1360926148/device_config.o
 
-.text             0x8007a8       0x5be0
- .text            0x8007a8       0x2508 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
-                  0x8007a8                  _Scope_Main_Init
-                  0x800914                  _Scope_Main_Update
-                  0x800dd4                  _Scope_Main_Load
-                  0x8011c0                  _Scope_Main_Save
-                  0x802124                  _Scope_Main_GetAddress
- .text            0x802cb0        0xdf8 ..\x2cscope\X2CScopeLib.X.a(Services.o)
-                  0x802cb0                  _sendSvNotAvailable
-                  0x802cf4                  _sendError
-                  0x8038f4                  _initServiceTable
-                  0x803948                  _addCoreServices
- .text            0x803aa8        0xb40 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
-                  0x804588                  _initLNet
- .text            0x8045e8        0xa10 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
-                  0x8045e8                  _addBlockServices
-                  0x804630                  _addExtendedBlockServices
-                  0x804658                  _putRAMBlock
-                  0x8049fc                  _getRAMBlock
-                  0x804d3c                  _putBlockData
-                  0x804eb4                  _getBlockData
- .text            0x804ff8        0x624 build/default/debug/_ext/1360933982/pfc.o
-                  0x80523c                  _PFC_StateMachine
-                  0x805600                  _PFC_ServiceInit
- .text            0x80561c        0x28c build/default/debug/_ext/1360926148/clock.o
-                  0x80561c                  _InitOscillator
- .text            0x8058a8        0x22c ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
-                  0x8058a8                  _Common_Init
-                  0x8058b8                  _Common_Update
-                  0x8058c8                  _Common_Load
-                  0x8058dc                  _Common_Save
-                  0x805910                  _Common_GetAddress
-                  0x805924                  _getAbsValI8
-                  0x805968                  _getAbsValI16
-                  0x8059ac                  _getAbsValI32
-                  0x8059f8                  _getAbsValI64
-                  0x805a68                  _getAbsValR32
-                  0x805a94                  _getAbsValR64
- .text            0x805ad4        0x210 build/default/debug/_ext/1360926148/pwm.o
-                  0x805ad4                  _InitPWMGenerator4
-                  0x805c64                  _InitPWMGenerators
- .text            0x805ce4        0x19c ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
-                  0x805ce4                  _X2CScope_Initialise
-                  0x805d80                  _X2CScope_Communicate
-                  0x805d9c                  _X2CScope_Update
-                  0x805dac                  _X2CScope_HookUARTFunctions
-                  0x805de4                  _sendSerialWrapper
-                  0x805e04                  _receiveSerialWrapper
-                  0x805e18                  _isReceiveDataAvailableWrapper
-                  0x805e2c                  _isSendReadyWrapper
-                  0x805e40                  _initSerial
- .text            0x805e80        0x18c build/default/debug/_ext/1360926148/board_service.o
-                  0x805eec                  _IsPressed_Button1
-                  0x805f00                  _IsPressed_Button2
-                  0x805f14                  _BoardServiceStepIsr
-                  0x805f2c                  _BoardService
-                  0x805f6c                  _BoardServiceInit
-                  0x805f7c                  _HAL_InitPeripherals
-                  0x805fe4                  _HAL_PFCPWMDisableOutputs
-                  0x805ff8                  _HAL_PFCPWMEnableOutputs
-                  0x806004                  _ClearPWMPCIFault
- .text            0x80600c        0x134 build/default/debug/_ext/1360926148/uart1.o
-                  0x80600c                  _UART1_Initialize
- .text            0x806140        0x130 build/default/debug/_ext/1360926148/adc.o
-                  0x806140                  _InitializeADCs
- .text            0x806270        0x118 ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
-                  0x806270                  _initTableStruct
-                  0x806340                  _addTableStructProtocol
+.text             0x8007cc       0x5be0
+ .text            0x8007cc       0x2508 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
+                  0x8007cc                  _Scope_Main_Init
+                  0x800938                  _Scope_Main_Update
+                  0x800df8                  _Scope_Main_Load
+                  0x8011e4                  _Scope_Main_Save
+                  0x802148                  _Scope_Main_GetAddress
+ .text            0x802cd4        0xdf8 ..\x2cscope\X2CScopeLib.X.a(Services.o)
+                  0x802cd4                  _sendSvNotAvailable
+                  0x802d18                  _sendError
+                  0x803918                  _initServiceTable
+                  0x80396c                  _addCoreServices
+ .text            0x803acc        0xb40 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
+                  0x8045ac                  _initLNet
+ .text            0x80460c        0xa10 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
+                  0x80460c                  _addBlockServices
+                  0x804654                  _addExtendedBlockServices
+                  0x80467c                  _putRAMBlock
+                  0x804a20                  _getRAMBlock
+                  0x804d60                  _putBlockData
+                  0x804ed8                  _getBlockData
+ .text            0x80501c        0x624 build/default/debug/_ext/1360933982/pfc.o
+                  0x805260                  _PFC_StateMachine
+                  0x805624                  _PFC_ServiceInit
+ .text            0x805640        0x28c build/default/debug/_ext/1360926148/clock.o
+                  0x805640                  _InitOscillator
+ .text            0x8058cc        0x22c ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
+                  0x8058cc                  _Common_Init
+                  0x8058dc                  _Common_Update
+                  0x8058ec                  _Common_Load
+                  0x805900                  _Common_Save
+                  0x805934                  _Common_GetAddress
+                  0x805948                  _getAbsValI8
+                  0x80598c                  _getAbsValI16
+                  0x8059d0                  _getAbsValI32
+                  0x805a1c                  _getAbsValI64
+                  0x805a8c                  _getAbsValR32
+                  0x805ab8                  _getAbsValR64
+ .text            0x805af8        0x210 build/default/debug/_ext/1360926148/pwm.o
+                  0x805af8                  _InitPWMGenerator4
+                  0x805c88                  _InitPWMGenerators
+ .text            0x805d08        0x19c ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
+                  0x805d08                  _X2CScope_Initialise
+                  0x805da4                  _X2CScope_Communicate
+                  0x805dc0                  _X2CScope_Update
+                  0x805dd0                  _X2CScope_HookUARTFunctions
+                  0x805e08                  _sendSerialWrapper
+                  0x805e28                  _receiveSerialWrapper
+                  0x805e3c                  _isReceiveDataAvailableWrapper
+                  0x805e50                  _isSendReadyWrapper
+                  0x805e64                  _initSerial
+ .text            0x805ea4        0x18c build/default/debug/_ext/1360926148/board_service.o
+                  0x805f10                  _IsPressed_Button1
+                  0x805f24                  _IsPressed_Button2
+                  0x805f38                  _BoardServiceStepIsr
+                  0x805f50                  _BoardService
+                  0x805f90                  _BoardServiceInit
+                  0x805fa0                  _HAL_InitPeripherals
+                  0x806008                  _HAL_PFCPWMDisableOutputs
+                  0x80601c                  _HAL_PFCPWMEnableOutputs
+                  0x806028                  _ClearPWMPCIFault
+ .text            0x806030        0x134 build/default/debug/_ext/1360926148/uart1.o
+                  0x806030                  _UART1_Initialize
+ .text            0x806164        0x130 build/default/debug/_ext/1360926148/adc.o
+                  0x806164                  _InitializeADCs
+ .text            0x806294        0x118 ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
+                  0x806294                  _initTableStruct
+                  0x806364                  _addTableStructProtocol
 
-.dinit            0x806388         0xfc
- .dinit           0x806388         0xfc data_init
+.dinit            0x8063ac         0xfc
+ .dinit           0x8063ac         0xfc data_init
 
-.text             0x806484        0x394
- .text            0x806484         0xdc ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
-                  0x806484                  _initSerialGeneric
-                  0x8064dc                  _linkSerial
- .text            0x806560         0xa4 build/default/debug/_ext/1360926148/port_config.o
-                  0x806560                  _MapGPIOHWFunction
-                  0x8065c0                  _SetupGPIOPorts
- .text            0x806604         0x94 build/default/debug/_ext/1798147462/diagnostics.o
-                  0x806634                  _DiagnosticsStepMain
-                  0x80663c                  _DiagnosticsStepIsr
-                  0x806644                  _X2CScope_Init
-                  0x806668                  _DiagnosticsInit
- .text            0x806698         0x70 build/default/debug/_ext/1360933982/pfc_measure.o
-                  0x806698                  _PFC_MeasureCurrentInit
-                  0x8066b4                  _PFC_MeasureCurrentOffset
- .text            0x806708         0x5c build/default/debug/_ext/1360933982/pfc_pi.o
-                  0x806708                  _PFC_ControllerPIUpdate
- .text            0x806764         0x38 build/default/debug/_ext/1360926148/timer1.o
-                  0x806764                  _TIMER1_Initialize
- .text            0x80679c         0x2c ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
-                  0x80679c                  _initVersionInfo
- .text            0x8067c8         0x28 build/default/debug/_ext/1472/main.o
-                  0x8067c8                  _main
- .text            0x8067f0         0x28 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
-                  0x8067f0                  _X2C_Init
-                  0x806804                  _X2C_Update
+.text             0x8064a8        0x394
+ .text            0x8064a8         0xdc ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
+                  0x8064a8                  _initSerialGeneric
+                  0x806500                  _linkSerial
+ .text            0x806584         0xa4 build/default/debug/_ext/1360926148/port_config.o
+                  0x806584                  _MapGPIOHWFunction
+                  0x8065e4                  _SetupGPIOPorts
+ .text            0x806628         0x94 build/default/debug/_ext/1798147462/diagnostics.o
+                  0x806658                  _DiagnosticsStepMain
+                  0x806660                  _DiagnosticsStepIsr
+                  0x806668                  _X2CScope_Init
+                  0x80668c                  _DiagnosticsInit
+ .text            0x8066bc         0x70 build/default/debug/_ext/1360933982/pfc_measure.o
+                  0x8066bc                  _PFC_MeasureCurrentInit
+                  0x8066d8                  _PFC_MeasureCurrentOffset
+ .text            0x80672c         0x5c build/default/debug/_ext/1360933982/pfc_pi.o
+                  0x80672c                  _PFC_ControllerPIUpdate
+ .text            0x806788         0x38 build/default/debug/_ext/1360926148/timer1.o
+                  0x806788                  _TIMER1_Initialize
+ .text            0x8067c0         0x2c ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
+                  0x8067c0                  _initVersionInfo
+ .text            0x8067ec         0x28 build/default/debug/_ext/1472/main.o
+                  0x8067ec                  _main
+ .text            0x806814         0x28 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
+                  0x806814                  _X2C_Init
+                  0x806828                  _X2C_Update
