@@ -7,29 +7,26 @@ Command:
   -p33AK128MC106 \
   --mdfp=C:/Program Files/Microchip/MPLABX/v6.30/packs/Microchip/dsPIC33AK-MC_DFP/1.4.172/xc16 \
   -o \
-  dist/default/debug/pfc.X.debug.elf \
+  dist/default/production/pfc.X.production.elf \
   -Lc:/program files/microchip/xc-dsc/v3.31/bin/bin/.. \
   -LC:/Program Files/Microchip/MPLABX/v6.30/packs/Microchip/dsPIC33AK-MC_DFP/1.4.172/xc16/bin/../support/dsPIC33A/gld \
   -Lc:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib \
-  build/default/debug/_ext/1360926148/adc.o \
-  build/default/debug/_ext/1360926148/board_service.o \
-  build/default/debug/_ext/1360926148/clock.o \
-  build/default/debug/_ext/1360926148/port_config.o \
-  build/default/debug/_ext/1360926148/pwm.o \
-  build/default/debug/_ext/1360926148/uart1.o \
-  build/default/debug/_ext/1360926148/timer1.o \
-  build/default/debug/_ext/1360926148/device_config.o \
-  build/default/debug/_ext/1360933982/pfc.o \
-  build/default/debug/_ext/1360933982/pfc_measure.o \
-  build/default/debug/_ext/1360933982/pfc_pi.o \
-  build/default/debug/_ext/1798147462/diagnostics.o \
-  build/default/debug/_ext/1472/main.o \
+  build/default/production/_ext/1360926148/adc.o \
+  build/default/production/_ext/1360926148/board_service.o \
+  build/default/production/_ext/1360926148/clock.o \
+  build/default/production/_ext/1360926148/port_config.o \
+  build/default/production/_ext/1360926148/pwm.o \
+  build/default/production/_ext/1360926148/uart1.o \
+  build/default/production/_ext/1360926148/timer1.o \
+  build/default/production/_ext/1360926148/device_config.o \
+  build/default/production/_ext/1360933982/pfc.o \
+  build/default/production/_ext/1360933982/pfc_measure.o \
+  build/default/production/_ext/1360933982/pfc_pi.o \
+  build/default/production/_ext/1798147462/diagnostics.o \
+  build/default/production/_ext/1472/main.o \
   ..\x2cscope\X2CScopeLib.X.a \
   --defsym=__MPLAB_BUILD=1 \
-  --defsym=__MPLAB_DEBUG=1 \
-  --defsym=__DEBUG=1 \
-  --defsym=__MPLAB_DEBUGGER_SNAP=1 \
-  -Tp33AK128MC106.00001988.00 \
+  -Tp33AK128MC106.00004118.00 \
   --no-check-sections \
   --data-init \
   --pack-data \
@@ -42,10 +39,10 @@ Command:
   --library-path=.. \
   --no-force-link \
   --smart-io \
-  -Map=PMSM.X.debug.map \
+  -Map=PMSM.X.production.map \
   --report-mem \
   --memorysummary \
-  dist/default/debug/memoryfile.xml \
+  dist/default/production/memoryfile.xml \
   --start-group \
   --library=c99-pic30-elf \
   --library=m-elf \
@@ -55,7 +52,7 @@ Command:
 Archive member included to satisfy reference by file (symbol)
 
 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
-                              build/default/debug/_ext/1798147462/diagnostics.o (_X2CScope_Initialise)
+                              build/default/production/_ext/1798147462/diagnostics.o (_X2CScope_Initialise)
 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
                               ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o) (_addBlockServices)
 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -79,7 +76,7 @@ Optional library libp33AK128MC106.a not found
 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt_start_mode_normal.AAMeo)
                               (__crt_start_mode_normal)
 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(delay32.AAMeo)
-                              build/default/debug/_ext/1360926148/board_service.o (___delay32)
+                              build/default/production/_ext/1360926148/board_service.o (___delay32)
 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(crt0_extendedaa.o)
                               (__resetPRI)
 c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.a(data_init_extendedaa.o)
@@ -640,24 +637,21 @@ program          0x800004           0x01fffc           xr
 
 Linker script and memory map
 
-LOAD build/default/debug/_ext/1360926148/adc.o
-LOAD build/default/debug/_ext/1360926148/board_service.o
-LOAD build/default/debug/_ext/1360926148/clock.o
-LOAD build/default/debug/_ext/1360926148/port_config.o
-LOAD build/default/debug/_ext/1360926148/pwm.o
-LOAD build/default/debug/_ext/1360926148/uart1.o
-LOAD build/default/debug/_ext/1360926148/timer1.o
-LOAD build/default/debug/_ext/1360926148/device_config.o
-LOAD build/default/debug/_ext/1360933982/pfc.o
-LOAD build/default/debug/_ext/1360933982/pfc_measure.o
-LOAD build/default/debug/_ext/1360933982/pfc_pi.o
-LOAD build/default/debug/_ext/1798147462/diagnostics.o
-LOAD build/default/debug/_ext/1472/main.o
+LOAD build/default/production/_ext/1360926148/adc.o
+LOAD build/default/production/_ext/1360926148/board_service.o
+LOAD build/default/production/_ext/1360926148/clock.o
+LOAD build/default/production/_ext/1360926148/port_config.o
+LOAD build/default/production/_ext/1360926148/pwm.o
+LOAD build/default/production/_ext/1360926148/uart1.o
+LOAD build/default/production/_ext/1360926148/timer1.o
+LOAD build/default/production/_ext/1360926148/device_config.o
+LOAD build/default/production/_ext/1360933982/pfc.o
+LOAD build/default/production/_ext/1360933982/pfc_measure.o
+LOAD build/default/production/_ext/1360933982/pfc_pi.o
+LOAD build/default/production/_ext/1798147462/diagnostics.o
+LOAD build/default/production/_ext/1472/main.o
 LOAD ..\x2cscope\X2CScopeLib.X.a
                     0x0001                  __MPLAB_BUILD = 0x1
-                    0x0001                  __MPLAB_DEBUG = 0x1
-                    0x0001                  __DEBUG = 0x1
-                    0x0001                  __MPLAB_DEBUGGER_SNAP = 0x1
 LOAD p33AK128MC106
 LOAD c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libfx-elf.a
                     0x7f3000                  __FCP = 0x7f3000
@@ -716,9 +710,9 @@ LOAD c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libfx-elf.a
  *(.user_init)
  *(.handle)
  *(.isr*)
- .isr.isr.text    0x8005c4        0x138 build/default/debug/_ext/1360933982/pfc.o
+ .isr.isr.text    0x8005c4        0x138 build/default/production/_ext/1360933982/pfc.o
                   0x8005c4                  __AD1CH1Interrupt
- .isr.isr.text    0x8006fc         0x5c build/default/debug/_ext/1472/main.o
+ .isr.isr.text    0x8006fc         0x5c build/default/production/_ext/1472/main.o
                   0x8006fc                  __T1Interrupt
  .isr             0x800758          0x8 default_isr
                   0x800758                  __DefaultInterrupt
@@ -840,19 +834,19 @@ __FWPUCB
 
 .comment            0x0000        0x81c
  *(.comment)
- .comment           0x0000         0x5c build/default/debug/_ext/1360926148/adc.o
- .comment           0x005c         0x5c build/default/debug/_ext/1360926148/board_service.o
- .comment           0x00b8         0x5c build/default/debug/_ext/1360926148/clock.o
- .comment           0x0114         0x5c build/default/debug/_ext/1360926148/port_config.o
- .comment           0x0170         0x5c build/default/debug/_ext/1360926148/pwm.o
- .comment           0x01cc         0x5c build/default/debug/_ext/1360926148/uart1.o
- .comment           0x0228         0x5c build/default/debug/_ext/1360926148/timer1.o
- .comment           0x0284         0x5c build/default/debug/_ext/1360926148/device_config.o
- .comment           0x02e0         0x5c build/default/debug/_ext/1360933982/pfc.o
- .comment           0x033c         0x5c build/default/debug/_ext/1360933982/pfc_measure.o
- .comment           0x0398         0x5c build/default/debug/_ext/1360933982/pfc_pi.o
- .comment           0x03f4         0x5c build/default/debug/_ext/1798147462/diagnostics.o
- .comment           0x0450         0x5c build/default/debug/_ext/1472/main.o
+ .comment           0x0000         0x5c build/default/production/_ext/1360926148/adc.o
+ .comment           0x005c         0x5c build/default/production/_ext/1360926148/board_service.o
+ .comment           0x00b8         0x5c build/default/production/_ext/1360926148/clock.o
+ .comment           0x0114         0x5c build/default/production/_ext/1360926148/port_config.o
+ .comment           0x0170         0x5c build/default/production/_ext/1360926148/pwm.o
+ .comment           0x01cc         0x5c build/default/production/_ext/1360926148/uart1.o
+ .comment           0x0228         0x5c build/default/production/_ext/1360926148/timer1.o
+ .comment           0x0284         0x5c build/default/production/_ext/1360926148/device_config.o
+ .comment           0x02e0         0x5c build/default/production/_ext/1360933982/pfc.o
+ .comment           0x033c         0x5c build/default/production/_ext/1360933982/pfc_measure.o
+ .comment           0x0398         0x5c build/default/production/_ext/1360933982/pfc_pi.o
+ .comment           0x03f4         0x5c build/default/production/_ext/1798147462/diagnostics.o
+ .comment           0x0450         0x5c build/default/production/_ext/1472/main.o
  .comment           0x04ac         0x58 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .comment           0x0504         0x58 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .comment           0x055c         0x58 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -866,18 +860,18 @@ __FWPUCB
 
 .debug_info         0x0000      0x11955
  *(.debug_info)
- .debug_info        0x0000       0x11c1 build/default/debug/_ext/1360926148/adc.o
- .debug_info        0x11c1       0x172a build/default/debug/_ext/1360926148/board_service.o
- .debug_info        0x28eb        0xf52 build/default/debug/_ext/1360926148/clock.o
- .debug_info        0x383d        0xcec build/default/debug/_ext/1360926148/port_config.o
- .debug_info        0x4529       0x1109 build/default/debug/_ext/1360926148/pwm.o
- .debug_info        0x5632        0x8b3 build/default/debug/_ext/1360926148/uart1.o
- .debug_info        0x5ee5        0x8a5 build/default/debug/_ext/1360926148/timer1.o
- .debug_info        0x678a       0x12b9 build/default/debug/_ext/1360933982/pfc.o
- .debug_info        0x7a43        0x333 build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_info        0x7d76        0x345 build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_info        0x80bb       0x11d3 build/default/debug/_ext/1798147462/diagnostics.o
- .debug_info        0x928e        0x71c build/default/debug/_ext/1472/main.o
+ .debug_info        0x0000       0x11c1 build/default/production/_ext/1360926148/adc.o
+ .debug_info        0x11c1       0x172a build/default/production/_ext/1360926148/board_service.o
+ .debug_info        0x28eb        0xf52 build/default/production/_ext/1360926148/clock.o
+ .debug_info        0x383d        0xcec build/default/production/_ext/1360926148/port_config.o
+ .debug_info        0x4529       0x1109 build/default/production/_ext/1360926148/pwm.o
+ .debug_info        0x5632        0x8b3 build/default/production/_ext/1360926148/uart1.o
+ .debug_info        0x5ee5        0x8a5 build/default/production/_ext/1360926148/timer1.o
+ .debug_info        0x678a       0x12b9 build/default/production/_ext/1360933982/pfc.o
+ .debug_info        0x7a43        0x333 build/default/production/_ext/1360933982/pfc_measure.o
+ .debug_info        0x7d76        0x345 build/default/production/_ext/1360933982/pfc_pi.o
+ .debug_info        0x80bb       0x11d3 build/default/production/_ext/1798147462/diagnostics.o
+ .debug_info        0x928e        0x71c build/default/production/_ext/1472/main.o
  .debug_info        0x99aa       0x1184 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_info        0xab2e        0xf17 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .debug_info        0xba45       0x1089 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -892,18 +886,18 @@ __FWPUCB
 
 .debug_abbrev       0x0000       0x1d6a
  *(.debug_abbrev)
- .debug_abbrev      0x0000         0xb2 build/default/debug/_ext/1360926148/adc.o
- .debug_abbrev      0x00b2        0x25a build/default/debug/_ext/1360926148/board_service.o
- .debug_abbrev      0x030c         0xb2 build/default/debug/_ext/1360926148/clock.o
- .debug_abbrev      0x03be         0xc0 build/default/debug/_ext/1360926148/port_config.o
- .debug_abbrev      0x047e         0xc0 build/default/debug/_ext/1360926148/pwm.o
- .debug_abbrev      0x053e         0x9b build/default/debug/_ext/1360926148/uart1.o
- .debug_abbrev      0x05d9         0xbf build/default/debug/_ext/1360926148/timer1.o
- .debug_abbrev      0x0698        0x292 build/default/debug/_ext/1360933982/pfc.o
- .debug_abbrev      0x092a         0xa0 build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_abbrev      0x09ca         0x97 build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_abbrev      0x0a61        0x201 build/default/debug/_ext/1798147462/diagnostics.o
- .debug_abbrev      0x0c62         0xfc build/default/debug/_ext/1472/main.o
+ .debug_abbrev      0x0000         0xb2 build/default/production/_ext/1360926148/adc.o
+ .debug_abbrev      0x00b2        0x25a build/default/production/_ext/1360926148/board_service.o
+ .debug_abbrev      0x030c         0xb2 build/default/production/_ext/1360926148/clock.o
+ .debug_abbrev      0x03be         0xc0 build/default/production/_ext/1360926148/port_config.o
+ .debug_abbrev      0x047e         0xc0 build/default/production/_ext/1360926148/pwm.o
+ .debug_abbrev      0x053e         0x9b build/default/production/_ext/1360926148/uart1.o
+ .debug_abbrev      0x05d9         0xbf build/default/production/_ext/1360926148/timer1.o
+ .debug_abbrev      0x0698        0x292 build/default/production/_ext/1360933982/pfc.o
+ .debug_abbrev      0x092a         0xa0 build/default/production/_ext/1360933982/pfc_measure.o
+ .debug_abbrev      0x09ca         0x97 build/default/production/_ext/1360933982/pfc_pi.o
+ .debug_abbrev      0x0a61        0x201 build/default/production/_ext/1798147462/diagnostics.o
+ .debug_abbrev      0x0c62         0xfc build/default/production/_ext/1472/main.o
  .debug_abbrev      0x0d5e        0x1cd ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_abbrev      0x0f2b        0x1dd ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .debug_abbrev      0x1108        0x213 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -917,19 +911,19 @@ __FWPUCB
 
 .debug_line         0x0000       0x4086
  *(.debug_line)
- .debug_line        0x0000        0x20c build/default/debug/_ext/1360926148/adc.o
- .debug_line        0x020c        0x392 build/default/debug/_ext/1360926148/board_service.o
- .debug_line        0x059e        0x39d build/default/debug/_ext/1360926148/clock.o
- .debug_line        0x093b        0x228 build/default/debug/_ext/1360926148/port_config.o
- .debug_line        0x0b63        0x3e7 build/default/debug/_ext/1360926148/pwm.o
- .debug_line        0x0f4a        0x324 build/default/debug/_ext/1360926148/uart1.o
- .debug_line        0x126e        0x191 build/default/debug/_ext/1360926148/timer1.o
- .debug_line        0x13ff          0x0 build/default/debug/_ext/1360926148/device_config.o
- .debug_line        0x13ff        0x6b6 build/default/debug/_ext/1360933982/pfc.o
- .debug_line        0x1ab5         0xfd build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_line        0x1bb2         0xab build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_line        0x1c5d        0x249 build/default/debug/_ext/1798147462/diagnostics.o
- .debug_line        0x1ea6        0x1c0 build/default/debug/_ext/1472/main.o
+ .debug_line        0x0000        0x20c build/default/production/_ext/1360926148/adc.o
+ .debug_line        0x020c        0x392 build/default/production/_ext/1360926148/board_service.o
+ .debug_line        0x059e        0x39d build/default/production/_ext/1360926148/clock.o
+ .debug_line        0x093b        0x228 build/default/production/_ext/1360926148/port_config.o
+ .debug_line        0x0b63        0x3e7 build/default/production/_ext/1360926148/pwm.o
+ .debug_line        0x0f4a        0x324 build/default/production/_ext/1360926148/uart1.o
+ .debug_line        0x126e        0x191 build/default/production/_ext/1360926148/timer1.o
+ .debug_line        0x13ff          0x0 build/default/production/_ext/1360926148/device_config.o
+ .debug_line        0x13ff        0x6b6 build/default/production/_ext/1360933982/pfc.o
+ .debug_line        0x1ab5         0xfd build/default/production/_ext/1360933982/pfc_measure.o
+ .debug_line        0x1bb2         0xab build/default/production/_ext/1360933982/pfc_pi.o
+ .debug_line        0x1c5d        0x249 build/default/production/_ext/1798147462/diagnostics.o
+ .debug_line        0x1ea6        0x1c0 build/default/production/_ext/1472/main.o
  .debug_line        0x2066        0x17e ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_line        0x21e4        0x45e ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .debug_line        0x2642        0x400 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -943,18 +937,18 @@ __FWPUCB
 
 .debug_frame        0x0000        0xb40
  *(.debug_frame)
- .debug_frame       0x0000         0x24 build/default/debug/_ext/1360926148/adc.o
- .debug_frame       0x0024         0xc8 build/default/debug/_ext/1360926148/board_service.o
- .debug_frame       0x00ec         0x24 build/default/debug/_ext/1360926148/clock.o
- .debug_frame       0x0110         0x34 build/default/debug/_ext/1360926148/port_config.o
- .debug_frame       0x0144         0x34 build/default/debug/_ext/1360926148/pwm.o
- .debug_frame       0x0178         0x24 build/default/debug/_ext/1360926148/uart1.o
- .debug_frame       0x019c         0x24 build/default/debug/_ext/1360926148/timer1.o
- .debug_frame       0x01c0        0x110 build/default/debug/_ext/1360933982/pfc.o
- .debug_frame       0x02d0         0x44 build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_frame       0x0314         0x24 build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_frame       0x0338         0x94 build/default/debug/_ext/1798147462/diagnostics.o
- .debug_frame       0x03cc         0x5c build/default/debug/_ext/1472/main.o
+ .debug_frame       0x0000         0x24 build/default/production/_ext/1360926148/adc.o
+ .debug_frame       0x0024         0xc8 build/default/production/_ext/1360926148/board_service.o
+ .debug_frame       0x00ec         0x24 build/default/production/_ext/1360926148/clock.o
+ .debug_frame       0x0110         0x34 build/default/production/_ext/1360926148/port_config.o
+ .debug_frame       0x0144         0x34 build/default/production/_ext/1360926148/pwm.o
+ .debug_frame       0x0178         0x24 build/default/production/_ext/1360926148/uart1.o
+ .debug_frame       0x019c         0x24 build/default/production/_ext/1360926148/timer1.o
+ .debug_frame       0x01c0        0x110 build/default/production/_ext/1360933982/pfc.o
+ .debug_frame       0x02d0         0x44 build/default/production/_ext/1360933982/pfc_measure.o
+ .debug_frame       0x0314         0x24 build/default/production/_ext/1360933982/pfc_pi.o
+ .debug_frame       0x0338         0x94 build/default/production/_ext/1798147462/diagnostics.o
+ .debug_frame       0x03cc         0x5c build/default/production/_ext/1472/main.o
  .debug_frame       0x0428         0xec ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_frame       0x0514         0xa4 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .debug_frame       0x05b8         0xd8 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -968,19 +962,19 @@ __FWPUCB
 
 .debug_str          0x0000        0x5a7
  *(.debug_str)
- .debug_str         0x0000         0x47 build/default/debug/_ext/1360926148/adc.o
- .debug_str         0x0047         0x3d build/default/debug/_ext/1360926148/board_service.o
- .debug_str         0x0084         0x50 build/default/debug/_ext/1360926148/clock.o
- .debug_str         0x00d4          0x0 build/default/debug/_ext/1360926148/port_config.o
- .debug_str         0x00d4          0x0 build/default/debug/_ext/1360926148/pwm.o
- .debug_str         0x00d4          0x0 build/default/debug/_ext/1360926148/uart1.o
- .debug_str         0x00d4          0x0 build/default/debug/_ext/1360926148/timer1.o
- .debug_str         0x00d4          0x0 build/default/debug/_ext/1360926148/device_config.o
- .debug_str         0x00d4         0xab build/default/debug/_ext/1360933982/pfc.o
- .debug_str         0x017f          0x9 build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_str         0x0188          0x0 build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_str         0x0188         0x65 build/default/debug/_ext/1798147462/diagnostics.o
- .debug_str         0x01ed         0x99 build/default/debug/_ext/1472/main.o
+ .debug_str         0x0000         0x47 build/default/production/_ext/1360926148/adc.o
+ .debug_str         0x0047         0x3d build/default/production/_ext/1360926148/board_service.o
+ .debug_str         0x0084         0x50 build/default/production/_ext/1360926148/clock.o
+ .debug_str         0x00d4          0x0 build/default/production/_ext/1360926148/port_config.o
+ .debug_str         0x00d4          0x0 build/default/production/_ext/1360926148/pwm.o
+ .debug_str         0x00d4          0x0 build/default/production/_ext/1360926148/uart1.o
+ .debug_str         0x00d4          0x0 build/default/production/_ext/1360926148/timer1.o
+ .debug_str         0x00d4          0x0 build/default/production/_ext/1360926148/device_config.o
+ .debug_str         0x00d4         0xab build/default/production/_ext/1360933982/pfc.o
+ .debug_str         0x017f          0x9 build/default/production/_ext/1360933982/pfc_measure.o
+ .debug_str         0x0188          0x0 build/default/production/_ext/1360933982/pfc_pi.o
+ .debug_str         0x0188         0x65 build/default/production/_ext/1798147462/diagnostics.o
+ .debug_str         0x01ed         0x99 build/default/production/_ext/1472/main.o
  .debug_str         0x0286         0xa8 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_str         0x032e         0x51 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .debug_str         0x037f         0x79 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -994,10 +988,10 @@ __FWPUCB
 
 .debug_loc          0x0000        0xc1a
  *(.debug_loc)
- .debug_loc         0x0000         0x64 build/default/debug/_ext/1360926148/board_service.o
- .debug_loc         0x0064        0x2e9 build/default/debug/_ext/1360933982/pfc.o
- .debug_loc         0x034d         0x40 build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_loc         0x038d         0x2d build/default/debug/_ext/1798147462/diagnostics.o
+ .debug_loc         0x0000         0x64 build/default/production/_ext/1360926148/board_service.o
+ .debug_loc         0x0064        0x2e9 build/default/production/_ext/1360933982/pfc.o
+ .debug_loc         0x034d         0x40 build/default/production/_ext/1360933982/pfc_measure.o
+ .debug_loc         0x038d         0x2d build/default/production/_ext/1798147462/diagnostics.o
  .debug_loc         0x03ba        0x120 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_loc         0x04da         0xc0 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .debug_loc         0x059a        0x100 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -1017,18 +1011,18 @@ __FWPUCB
 
 .debug_ranges       0x0000        0x448
  *(.debug_ranges)
- .debug_ranges      0x0000         0x10 build/default/debug/_ext/1360926148/adc.o
- .debug_ranges      0x0010         0x60 build/default/debug/_ext/1360926148/board_service.o
- .debug_ranges      0x0070         0x10 build/default/debug/_ext/1360926148/clock.o
- .debug_ranges      0x0080         0x18 build/default/debug/_ext/1360926148/port_config.o
- .debug_ranges      0x0098         0x18 build/default/debug/_ext/1360926148/pwm.o
- .debug_ranges      0x00b0         0x10 build/default/debug/_ext/1360926148/uart1.o
- .debug_ranges      0x00c0         0x10 build/default/debug/_ext/1360926148/timer1.o
- .debug_ranges      0x00d0         0x88 build/default/debug/_ext/1360933982/pfc.o
- .debug_ranges      0x0158         0x18 build/default/debug/_ext/1360933982/pfc_measure.o
- .debug_ranges      0x0170         0x10 build/default/debug/_ext/1360933982/pfc_pi.o
- .debug_ranges      0x0180         0x48 build/default/debug/_ext/1798147462/diagnostics.o
- .debug_ranges      0x01c8         0x18 build/default/debug/_ext/1472/main.o
+ .debug_ranges      0x0000         0x10 build/default/production/_ext/1360926148/adc.o
+ .debug_ranges      0x0010         0x60 build/default/production/_ext/1360926148/board_service.o
+ .debug_ranges      0x0070         0x10 build/default/production/_ext/1360926148/clock.o
+ .debug_ranges      0x0080         0x18 build/default/production/_ext/1360926148/port_config.o
+ .debug_ranges      0x0098         0x18 build/default/production/_ext/1360926148/pwm.o
+ .debug_ranges      0x00b0         0x10 build/default/production/_ext/1360926148/uart1.o
+ .debug_ranges      0x00c0         0x10 build/default/production/_ext/1360926148/timer1.o
+ .debug_ranges      0x00d0         0x88 build/default/production/_ext/1360933982/pfc.o
+ .debug_ranges      0x0158         0x18 build/default/production/_ext/1360933982/pfc_measure.o
+ .debug_ranges      0x0170         0x10 build/default/production/_ext/1360933982/pfc_pi.o
+ .debug_ranges      0x0180         0x48 build/default/production/_ext/1798147462/diagnostics.o
+ .debug_ranges      0x01c8         0x18 build/default/production/_ext/1472/main.o
  .debug_ranges      0x01e0         0x50 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_ranges      0x0230         0x38 ..\x2cscope\X2CScopeLib.X.a(BlockServicesX2C.o)
  .debug_ranges      0x0268         0x48 ..\x2cscope\X2CScopeLib.X.a(LNet.o)
@@ -1043,29 +1037,29 @@ __FWPUCB
 .debug_aranges      0x0000        0x578
  *(.debug_aranges)
  .debug_aranges
-                    0x0000         0x20 build/default/debug/_ext/1360926148/adc.o
+                    0x0000         0x20 build/default/production/_ext/1360926148/adc.o
  .debug_aranges
-                    0x0020         0x70 build/default/debug/_ext/1360926148/board_service.o
+                    0x0020         0x70 build/default/production/_ext/1360926148/board_service.o
  .debug_aranges
-                    0x0090         0x20 build/default/debug/_ext/1360926148/clock.o
+                    0x0090         0x20 build/default/production/_ext/1360926148/clock.o
  .debug_aranges
-                    0x00b0         0x28 build/default/debug/_ext/1360926148/port_config.o
+                    0x00b0         0x28 build/default/production/_ext/1360926148/port_config.o
  .debug_aranges
-                    0x00d8         0x28 build/default/debug/_ext/1360926148/pwm.o
+                    0x00d8         0x28 build/default/production/_ext/1360926148/pwm.o
  .debug_aranges
-                    0x0100         0x20 build/default/debug/_ext/1360926148/uart1.o
+                    0x0100         0x20 build/default/production/_ext/1360926148/uart1.o
  .debug_aranges
-                    0x0120         0x20 build/default/debug/_ext/1360926148/timer1.o
+                    0x0120         0x20 build/default/production/_ext/1360926148/timer1.o
  .debug_aranges
-                    0x0140         0x68 build/default/debug/_ext/1360933982/pfc.o
+                    0x0140         0x68 build/default/production/_ext/1360933982/pfc.o
  .debug_aranges
-                    0x01a8         0x28 build/default/debug/_ext/1360933982/pfc_measure.o
+                    0x01a8         0x28 build/default/production/_ext/1360933982/pfc_measure.o
  .debug_aranges
-                    0x01d0         0x20 build/default/debug/_ext/1360933982/pfc_pi.o
+                    0x01d0         0x20 build/default/production/_ext/1360933982/pfc_pi.o
  .debug_aranges
-                    0x01f0         0x58 build/default/debug/_ext/1798147462/diagnostics.o
+                    0x01f0         0x58 build/default/production/_ext/1798147462/diagnostics.o
  .debug_aranges
-                    0x0248         0x28 build/default/debug/_ext/1472/main.o
+                    0x0248         0x28 build/default/production/_ext/1472/main.o
  .debug_aranges
                     0x0270         0x60 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  .debug_aranges
@@ -3911,7 +3905,7 @@ LOAD c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-pic30-elf.
 LOAD c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libm-elf.a
 LOAD c:/program files/microchip/xc-dsc/v3.31/bin/bin/../../lib\libc99-elf.a
 END GROUP
-OUTPUT(dist/default/debug/pfc.X.debug.elf elf32-pic30)
+OUTPUT(dist/default/production/pfc.X.production.elf elf32-pic30)
 LOAD __ivt_0
 LOAD default_isr
 LOAD data_init
@@ -3919,31 +3913,31 @@ LOAD data_init
 __c30_signature
                     0x0000         0x9c
  __c30_signature
-                    0x0000          0x6 build/default/debug/_ext/1360926148/adc.o
+                    0x0000          0x6 build/default/production/_ext/1360926148/adc.o
  __c30_signature
-                    0x0006          0x6 build/default/debug/_ext/1360926148/board_service.o
+                    0x0006          0x6 build/default/production/_ext/1360926148/board_service.o
  __c30_signature
-                    0x000c          0x6 build/default/debug/_ext/1360926148/clock.o
+                    0x000c          0x6 build/default/production/_ext/1360926148/clock.o
  __c30_signature
-                    0x0012          0x6 build/default/debug/_ext/1360926148/port_config.o
+                    0x0012          0x6 build/default/production/_ext/1360926148/port_config.o
  __c30_signature
-                    0x0018          0x6 build/default/debug/_ext/1360926148/pwm.o
+                    0x0018          0x6 build/default/production/_ext/1360926148/pwm.o
  __c30_signature
-                    0x001e          0x6 build/default/debug/_ext/1360926148/uart1.o
+                    0x001e          0x6 build/default/production/_ext/1360926148/uart1.o
  __c30_signature
-                    0x0024          0x6 build/default/debug/_ext/1360926148/timer1.o
+                    0x0024          0x6 build/default/production/_ext/1360926148/timer1.o
  __c30_signature
-                    0x002a          0x6 build/default/debug/_ext/1360926148/device_config.o
+                    0x002a          0x6 build/default/production/_ext/1360926148/device_config.o
  __c30_signature
-                    0x0030          0x6 build/default/debug/_ext/1360933982/pfc.o
+                    0x0030          0x6 build/default/production/_ext/1360933982/pfc.o
  __c30_signature
-                    0x0036          0x6 build/default/debug/_ext/1360933982/pfc_measure.o
+                    0x0036          0x6 build/default/production/_ext/1360933982/pfc_measure.o
  __c30_signature
-                    0x003c          0x6 build/default/debug/_ext/1360933982/pfc_pi.o
+                    0x003c          0x6 build/default/production/_ext/1360933982/pfc_pi.o
  __c30_signature
-                    0x0042          0x6 build/default/debug/_ext/1798147462/diagnostics.o
+                    0x0042          0x6 build/default/production/_ext/1798147462/diagnostics.o
  __c30_signature
-                    0x0048          0x6 build/default/debug/_ext/1472/main.o
+                    0x0048          0x6 build/default/production/_ext/1472/main.o
  __c30_signature
                     0x004e          0x6 ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
  __c30_signature
@@ -3974,13 +3968,13 @@ __c30_signature
 x2cscope_data_buf
                     0x4000       0x1324
  x2cscope_data_buf
-                    0x4000       0x1324 build/default/debug/_ext/1798147462/diagnostics.o
+                    0x4000       0x1324 build/default/production/_ext/1798147462/diagnostics.o
 
 .nbss               0x5324        0x130
- .nbss              0x5324        0x100 build/default/debug/_ext/1360933982/pfc.o
+ .nbss              0x5324        0x100 build/default/production/_ext/1360933982/pfc.o
                     0x5324                  _counter
                     0x5328                  _pfcParam
- .nbss              0x5424         0x14 build/default/debug/_ext/1360926148/board_service.o
+ .nbss              0x5424         0x14 build/default/production/_ext/1360926148/board_service.o
                     0x5424                  _boardServiceISRCounter
                     0x5428                  _buttonSpeedHalfDouble
                     0x5430                  _buttonStartStop
@@ -4014,324 +4008,324 @@ __ivt_0           0x800004        0x47c
                   0x800004                  __ivt_0
 
 .config_WPUCB     0x7f40c0          0x4
- .config_WPUCB    0x7f40c0          0x4 build/default/debug/_ext/1360926148/device_config.o
+ .config_WPUCB    0x7f40c0          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_WPUCB
                   0x7f48c0          0x4
  .config_BKUP_WPUCB
-                  0x7f48c0          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f48c0          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_EPUCB     0x7f40b0          0x4
- .config_EPUCB    0x7f40b0          0x4 build/default/debug/_ext/1360926148/device_config.o
+ .config_EPUCB    0x7f40b0          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_EPUCB
                   0x7f48b0          0x4
  .config_BKUP_EPUCB
-                  0x7f48b0          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f48b0          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_ICSPPED
                   0x7f40a0          0x4
  .config_ICSPPED
-                  0x7f40a0          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f40a0          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_ICSPPED
                   0x7f48a0          0x4
  .config_BKUP_ICSPPED
-                  0x7f48a0          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f48a0          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_SECDBG    0x7f4090          0x4
  .config_SECDBG
-                  0x7f4090          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4090          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_SECDBG
                   0x7f4890          0x4
  .config_BKUP_SECDBG
-                  0x7f4890          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4890          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_IRT       0x7f4080          0x4
- .config_IRT      0x7f4080          0x4 build/default/debug/_ext/1360926148/device_config.o
+ .config_IRT      0x7f4080          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_IRT
                   0x7f4880          0x4
  .config_BKUP_IRT
-                  0x7f4880          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4880          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR7END_END
                   0x7f4078          0x4
  .config_FPR7END_END
-                  0x7f4078          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4078          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR7END_END
                   0x7f4878          0x4
  .config_BKUP_FPR7END_END
-                  0x7f4878          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4878          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR7ST_START
                   0x7f4074          0x4
  .config_FPR7ST_START
-                  0x7f4074          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4074          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR7ST_START
                   0x7f4874          0x4
  .config_BKUP_FPR7ST_START
-                  0x7f4874          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4874          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR7CTRL_RTYPE
                   0x7f4070          0x4
  .config_FPR7CTRL_RTYPE
-                  0x7f4070          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4070          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR7CTRL_RTYPE
                   0x7f4870          0x4
  .config_BKUP_FPR7CTRL_RTYPE
-                  0x7f4870          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4870          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR6END_END
                   0x7f4068          0x4
  .config_FPR6END_END
-                  0x7f4068          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4068          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR6END_END
                   0x7f4868          0x4
  .config_BKUP_FPR6END_END
-                  0x7f4868          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4868          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR6ST_START
                   0x7f4064          0x4
  .config_FPR6ST_START
-                  0x7f4064          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4064          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR6ST_START
                   0x7f4864          0x4
  .config_BKUP_FPR6ST_START
-                  0x7f4864          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4864          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR6CTRL_RTYPE
                   0x7f4060          0x4
  .config_FPR6CTRL_RTYPE
-                  0x7f4060          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4060          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR6CTRL_RTYPE
                   0x7f4860          0x4
  .config_BKUP_FPR6CTRL_RTYPE
-                  0x7f4860          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4860          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR5END_END
                   0x7f4058          0x4
  .config_FPR5END_END
-                  0x7f4058          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4058          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR5END_END
                   0x7f4858          0x4
  .config_BKUP_FPR5END_END
-                  0x7f4858          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4858          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR5ST_START
                   0x7f4054          0x4
  .config_FPR5ST_START
-                  0x7f4054          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4054          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR5ST_START
                   0x7f4854          0x4
  .config_BKUP_FPR5ST_START
-                  0x7f4854          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4854          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR5CTRL_RTYPE
                   0x7f4050          0x4
  .config_FPR5CTRL_RTYPE
-                  0x7f4050          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4050          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR5CTRL_RTYPE
                   0x7f4850          0x4
  .config_BKUP_FPR5CTRL_RTYPE
-                  0x7f4850          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4850          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR4END_END
                   0x7f4048          0x4
  .config_FPR4END_END
-                  0x7f4048          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4048          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR4END_END
                   0x7f4848          0x4
  .config_BKUP_FPR4END_END
-                  0x7f4848          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4848          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR4ST_START
                   0x7f4044          0x4
  .config_FPR4ST_START
-                  0x7f4044          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4044          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR4ST_START
                   0x7f4844          0x4
  .config_BKUP_FPR4ST_START
-                  0x7f4844          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4844          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR4CTRL_RTYPE
                   0x7f4040          0x4
  .config_FPR4CTRL_RTYPE
-                  0x7f4040          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4040          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR4CTRL_RTYPE
                   0x7f4840          0x4
  .config_BKUP_FPR4CTRL_RTYPE
-                  0x7f4840          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4840          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR3END_END
                   0x7f4038          0x4
  .config_FPR3END_END
-                  0x7f4038          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4038          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR3END_END
                   0x7f4838          0x4
  .config_BKUP_FPR3END_END
-                  0x7f4838          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4838          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR3ST_START
                   0x7f4034          0x4
  .config_FPR3ST_START
-                  0x7f4034          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4034          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR3ST_START
                   0x7f4834          0x4
  .config_BKUP_FPR3ST_START
-                  0x7f4834          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4834          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR3CTRL_RTYPE
                   0x7f4030          0x4
  .config_FPR3CTRL_RTYPE
-                  0x7f4030          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4030          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR3CTRL_RTYPE
                   0x7f4830          0x4
  .config_BKUP_FPR3CTRL_RTYPE
-                  0x7f4830          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4830          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR2END_END
                   0x7f4028          0x4
  .config_FPR2END_END
-                  0x7f4028          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4028          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR2END_END
                   0x7f4828          0x4
  .config_BKUP_FPR2END_END
-                  0x7f4828          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4828          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR2ST_START
                   0x7f4024          0x4
  .config_FPR2ST_START
-                  0x7f4024          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4024          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR2ST_START
                   0x7f4824          0x4
  .config_BKUP_FPR2ST_START
-                  0x7f4824          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4824          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR2CTRL_RTYPE
                   0x7f4020          0x4
  .config_FPR2CTRL_RTYPE
-                  0x7f4020          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4020          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR2CTRL_RTYPE
                   0x7f4820          0x4
  .config_BKUP_FPR2CTRL_RTYPE
-                  0x7f4820          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4820          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR1END_END
                   0x7f4018          0x4
  .config_FPR1END_END
-                  0x7f4018          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4018          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR1END_END
                   0x7f4818          0x4
  .config_BKUP_FPR1END_END
-                  0x7f4818          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4818          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR1ST_START
                   0x7f4014          0x4
  .config_FPR1ST_START
-                  0x7f4014          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4014          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR1ST_START
                   0x7f4814          0x4
  .config_BKUP_FPR1ST_START
-                  0x7f4814          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4814          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR1CTRL_RTYPE
                   0x7f4010          0x4
  .config_FPR1CTRL_RTYPE
-                  0x7f4010          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4010          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR1CTRL_RTYPE
                   0x7f4810          0x4
  .config_BKUP_FPR1CTRL_RTYPE
-                  0x7f4810          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4810          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR0END_END
                   0x7f4008          0x4
  .config_FPR0END_END
-                  0x7f4008          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4008          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR0END_END
                   0x7f4808          0x4
  .config_BKUP_FPR0END_END
-                  0x7f4808          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4808          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR0ST_START
                   0x7f4004          0x4
  .config_FPR0ST_START
-                  0x7f4004          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4004          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR0ST_START
                   0x7f4804          0x4
  .config_BKUP_FPR0ST_START
-                  0x7f4804          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4804          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_FPR0CTRL_RTYPE
                   0x7f4000          0x4
  .config_FPR0CTRL_RTYPE
-                  0x7f4000          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4000          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_FPR0CTRL_RTYPE
                   0x7f4800          0x4
  .config_BKUP_FPR0CTRL_RTYPE
-                  0x7f4800          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f4800          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_WDTRSTEN
                   0x7f3030          0x4
  .config_WDTRSTEN
-                  0x7f3030          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f3030          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_WDTRSTEN
                   0x7f3830          0x4
  .config_BKUP_WDTRSTEN
-                  0x7f3830          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f3830          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_SPI2PIN
                   0x7f3020          0x4
  .config_SPI2PIN
-                  0x7f3020          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f3020          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_SPI2PIN
                   0x7f3820          0x4
  .config_BKUP_SPI2PIN
-                  0x7f3820          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f3820          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_JTAGEN    0x7f3010          0x4
  .config_JTAGEN
-                  0x7f3010          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f3010          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_JTAGEN
                   0x7f3810          0x4
  .config_BKUP_JTAGEN
-                  0x7f3810          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f3810          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_WPUCA     0x7f3000          0x4
- .config_WPUCA    0x7f3000          0x4 build/default/debug/_ext/1360926148/device_config.o
+ .config_WPUCA    0x7f3000          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .config_BKUP_WPUCA
                   0x7f3800          0x4
  .config_BKUP_WPUCA
-                  0x7f3800          0x4 build/default/debug/_ext/1360926148/device_config.o
+                  0x7f3800          0x4 build/default/production/_ext/1360926148/device_config.o
 
 .text             0x8007cc       0x5be4
  .text            0x8007cc       0x2508 ..\x2cscope\X2CScopeLib.X.a(Scope_Main.o)
@@ -4354,10 +4348,10 @@ __ivt_0           0x800004        0x47c
                   0x804a20                  _getRAMBlock
                   0x804d60                  _putBlockData
                   0x804ed8                  _getBlockData
- .text            0x80501c        0x624 build/default/debug/_ext/1360933982/pfc.o
+ .text            0x80501c        0x624 build/default/production/_ext/1360933982/pfc.o
                   0x805260                  _PFC_StateMachine
                   0x805624                  _PFC_ServiceInit
- .text            0x805640        0x28c build/default/debug/_ext/1360926148/clock.o
+ .text            0x805640        0x28c build/default/production/_ext/1360926148/clock.o
                   0x805640                  _InitOscillator
  .text            0x8058cc        0x22c ..\x2cscope\X2CScopeLib.X.a(CommonFcts.o)
                   0x8058cc                  _Common_Init
@@ -4371,7 +4365,7 @@ __ivt_0           0x800004        0x47c
                   0x805a1c                  _getAbsValI64
                   0x805a8c                  _getAbsValR32
                   0x805ab8                  _getAbsValR64
- .text            0x805af8        0x210 build/default/debug/_ext/1360926148/pwm.o
+ .text            0x805af8        0x210 build/default/production/_ext/1360926148/pwm.o
                   0x805af8                  _InitPWMGenerator4
                   0x805c88                  _InitPWMGenerators
  .text            0x805d08        0x19c ..\x2cscope\X2CScopeLib.X.a(X2CScopeWrapper.o)
@@ -4384,7 +4378,7 @@ __ivt_0           0x800004        0x47c
                   0x805e3c                  _isReceiveDataAvailableWrapper
                   0x805e50                  _isSendReadyWrapper
                   0x805e64                  _initSerial
- .text            0x805ea4        0x18c build/default/debug/_ext/1360926148/board_service.o
+ .text            0x805ea4        0x18c build/default/production/_ext/1360926148/board_service.o
                   0x805f10                  _IsPressed_Button1
                   0x805f24                  _IsPressed_Button2
                   0x805f38                  _BoardServiceStepIsr
@@ -4394,9 +4388,9 @@ __ivt_0           0x800004        0x47c
                   0x806008                  _HAL_PFCPWMDisableOutputs
                   0x80601c                  _HAL_PFCPWMEnableOutputs
                   0x806028                  _ClearPWMPCIFault
- .text            0x806030        0x134 build/default/debug/_ext/1360926148/adc.o
+ .text            0x806030        0x134 build/default/production/_ext/1360926148/adc.o
                   0x806030                  _InitializeADCs
- .text            0x806164        0x134 build/default/debug/_ext/1360926148/uart1.o
+ .text            0x806164        0x134 build/default/production/_ext/1360926148/uart1.o
                   0x806164                  _UART1_Initialize
  .text            0x806298        0x118 ..\x2cscope\X2CScopeLib.X.a(TableStruct.o)
                   0x806298                  _initTableStruct
@@ -4409,24 +4403,24 @@ __ivt_0           0x800004        0x47c
  .text            0x8064ac         0xdc ..\x2cscope\X2CScopeLib.X.a(SerialGeneric.o)
                   0x8064ac                  _initSerialGeneric
                   0x806504                  _linkSerial
- .text            0x806588         0xac build/default/debug/_ext/1360926148/port_config.o
+ .text            0x806588         0xac build/default/production/_ext/1360926148/port_config.o
                   0x806588                  _MapGPIOHWFunction
                   0x8065f0                  _SetupGPIOPorts
- .text            0x806634         0x94 build/default/debug/_ext/1798147462/diagnostics.o
+ .text            0x806634         0x94 build/default/production/_ext/1798147462/diagnostics.o
                   0x806664                  _DiagnosticsStepMain
                   0x80666c                  _DiagnosticsStepIsr
                   0x806674                  _X2CScope_Init
                   0x806698                  _DiagnosticsInit
- .text            0x8066c8         0x70 build/default/debug/_ext/1360933982/pfc_measure.o
+ .text            0x8066c8         0x70 build/default/production/_ext/1360933982/pfc_measure.o
                   0x8066c8                  _PFC_MeasureCurrentInit
                   0x8066e4                  _PFC_MeasureCurrentOffset
- .text            0x806738         0x5c build/default/debug/_ext/1360933982/pfc_pi.o
+ .text            0x806738         0x5c build/default/production/_ext/1360933982/pfc_pi.o
                   0x806738                  _PFC_ControllerPIUpdate
- .text            0x806794         0x38 build/default/debug/_ext/1360926148/timer1.o
+ .text            0x806794         0x38 build/default/production/_ext/1360926148/timer1.o
                   0x806794                  _TIMER1_Initialize
  .text            0x8067cc         0x2c ..\x2cscope\X2CScopeLib.X.a(VersionInfo.o)
                   0x8067cc                  _initVersionInfo
- .text            0x8067f8         0x28 build/default/debug/_ext/1472/main.o
+ .text            0x8067f8         0x28 build/default/production/_ext/1472/main.o
                   0x8067f8                  _main
  .text            0x806820         0x28 ..\x2cscope\X2CScopeLib.X.a(X2C.o)
                   0x806820                  _X2C_Init

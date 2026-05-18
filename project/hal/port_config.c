@@ -149,8 +149,11 @@ void MapGPIOHWFunction(void)
     ANSELBbits.ANSELB6  = 1;
     TRISBbits.TRISB6    = 1;
     /* Inductor Current (IL2) : PIN 15 OA3OUT/AD1AN3/CMP3A/RP6/RA5 */
-    ANSELAbits.ANSELA5  = 1;
-    TRISAbits.TRISA5    = 1;
+    /*ANSELAbits.ANSELA5  = 1;
+    TRISAbits.TRISA5    = 1;*/
+    /* Inductor Current (IL2) : PIN 3: PGC2/DACOUT1/AD1AN7/AD2AN3/CMP1D/CMP2D/CMP3D/RP2/SCL2/RA1 */
+    ANSELAbits.ANSELA1  = 1;
+    TRISAbits.TRISA1    = 1;    
 
     //PFC Enable pin : PIN 42: RP38/PWM4L/RC5 */
     TRISCbits.TRISC5   = 0; 

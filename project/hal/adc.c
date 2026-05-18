@@ -98,7 +98,14 @@ void InitializeADCs (void)
     
     /* Channel Configuration for IL2 */
     /* AD1AN3 :OA3OUT/AD1AN3/CMP3A/RP6/RA5*/
-    AD1CH3CONbits.PINSEL = 3;
+    /*AD1CH3CONbits.PINSEL = 3;
+    AD1CH3CONbits.SAMC   = 3;
+    AD1CH3CONbits.LEFT   = 0;
+    AD1CH3CONbits.DIFF   = 0;*/
+    
+    /* Channel Configuration for IL2 */
+    /* AD1AN7 : PGC2/DACOUT1/AD1AN7/AD2AN3/CMP1D/CMP2D/CMP3D/RP2/SCL2/RA1 */
+    AD1CH3CONbits.PINSEL = 7;
     AD1CH3CONbits.SAMC   = 3;
     AD1CH3CONbits.LEFT   = 0;
     AD1CH3CONbits.DIFF   = 0;
@@ -134,7 +141,7 @@ void InitializeADCs (void)
     /*PWM4 ADC Trigger 2 for VDC - AD1CH4*/
     AD1CH0CONbits.TRG1SRC = 0b01011;
     /* PWM4 ADC Trigger 2 for IL2 */
-    AD1CH2CONbits.TRG1SRC = 0b01010;
+    AD1CH2CONbits.TRG1SRC = 0b01011;
     /* PWM4 ADC Trigger 2 for IL2 */
     AD1CH3CONbits.TRG1SRC = 0b01011;	
 }
