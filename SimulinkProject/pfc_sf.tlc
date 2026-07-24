@@ -1,5 +1,5 @@
 %% File : pfc_sf.tlc
-%% Created : Wed May 13 20:15:52 2026
+%% Created : Thu Jul 23 08:11:62 2026
 %%
 %% Description: 
 %%   Simulink Coder wrapper functions interface generated for 
@@ -23,6 +23,8 @@
 %%
 %function BlockTypeSetup(block, system) void
     %assign uint16Type = LibGetDataTypeNameFromId(::CompiledModel.tSS_UINT16)
+    %assign booleanType = LibGetDataTypeNameFromId(::CompiledModel.tSS_BOOLEAN)
+    %assign charType = LibGetDataTypeNameFromId(::CompiledModel.tSS_CHAR)
     %assign uint8Type = LibGetDataTypeNameFromId(::CompiledModel.tSS_UINT8)
     %assign singleType = LibGetDataTypeNameFromId(::CompiledModel.tSS_SINGLE)
 
@@ -55,7 +57,10 @@
 			%<singleType> *test2,
 			%<singleType> *pwm_fac,
 			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out);
+			%<singleType> *pfcParam_piCurrent_out,
+			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
+			void *pfcParam_out, void *__pfcParam_outBUS);
+    SFB_EXTERN_C void pfc_sf_Terminate_wrapper_accel(void);
     #undef SFB_EXTERN_C
     #endif
     %closefile hFile
@@ -74,7 +79,8 @@
     %<LibEmitPlatformTypeIncludes()>
     #endif
     #include "%<hFileName>.h"
-    
+    #include "pfc_sf_bus.h"
+
     #ifdef __cplusplus
     #define SFB_EXTERN_C extern "C"
     #else
@@ -92,7 +98,9 @@
 			%<singleType> *test2,
 			%<singleType> *pwm_fac,
 			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out);
+			%<singleType> *pfcParam_piCurrent_out,
+			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
+			PFC_T_Bus *pfcParam_out);
     SFB_EXTERN_C void pfc_sf_Terminate_wrapper(void);
     void pfc_sf_Start_wrapper_accel(void){
     pfc_sf_Start_wrapper();
@@ -107,7 +115,9 @@
 			%<singleType> *test2,
 			%<singleType> *pwm_fac,
 			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out){
+			%<singleType> *pfcParam_piCurrent_out,
+			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
+			void *pfcParam_out, void *__pfcParam_outBUS){
     pfc_sf_Outputs_wrapper(Vdc_in,
 			Vac_in,
 			Il_in,
@@ -118,7 +128,15 @@
 			test2,
 			pwm_fac,
 			pfcParam_piVoltage_out,
-			pfcParam_piCurrent_out);
+			pfcParam_piCurrent_out,
+			SiL_Out_PFC_INRUSH_RELAY,
+			(PFC_T_Bus *) __pfcParam_outBUS);
+
+    %assign dTypeId = LibBlockOutputSignalDataTypeId(8)
+    %<SLibAssignUserStructToSLStruct(dTypeId, "(%<charType> *) pfcParam_out", "(*(PFC_T_Bus *) __pfcParam_outBUS)",  0)>
+    }
+    void pfc_sf_Terminate_wrapper_accel(void){
+    pfc_sf_Terminate_wrapper();
     }
 #undef SFB_EXTERN_C
 
@@ -147,7 +165,9 @@
 			%<singleType> *test2,
 			%<singleType> *pwm_fac,
 			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out);
+			%<singleType> *pfcParam_piCurrent_out,
+			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
+			PFC_T_Bus *pfcParam_out);
 
     SFB_EXTERN_C void pfc_sf_Terminate_wrapper(void);
 
@@ -159,6 +179,11 @@
   %%
 %endfunction
 
+%% Function: BlockInstanceSetup ===============================================
+%%
+%function BlockInstanceSetup(block, system) void
+    %<LibEnableBlockFcnOptimizations(block)>
+%endfunction
 
 %% Function: Start ============================================================
 %%
@@ -190,16 +215,31 @@
   %assign py4 = LibBlockOutputSignalAddr(4, "", "", 0)
   %assign py5 = LibBlockOutputSignalAddr(5, "", "", 0)
   %assign py6 = LibBlockOutputSignalAddr(6, "", "", 0)
+  %assign py7 = LibBlockOutputSignalAddr(7, "", "", 0)
+  %assign py8 = LibBlockOutputSignalAddr(8, "", "", 0)
   
   %if IsModelReferenceSimTarget() || CodeFormat == "S-Function" || ::isRAccel
-    pfc_sf_Outputs_wrapper_accel(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<py0>, %<py1>, %<py2>, %<py3>, %<py4>, %<py5>, %<py6>);
+    %assign pfcParam_outBUS_ptr = LibBlockDWorkAddr(pfcParam_outBUS, "", "", 0)
+    pfc_sf_Outputs_wrapper_accel(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<py0>, %<py1>, %<py2>, %<py3>, %<py4>, %<py5>, %<py6>, %<py7>, %<py8>, %<pfcParam_outBUS_ptr>);
   %else
-    pfc_sf_Outputs_wrapper(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<py0>, %<py1>, %<py2>, %<py3>, %<py4>, %<py5>, %<py6>);
+    pfc_sf_Outputs_wrapper(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<py0>, %<py1>, %<py2>, %<py3>, %<py4>, %<py5>, %<py6>, %<py7>, %<py8>);
   %endif
 
   %%
 %endfunction
 
+%% Function: Terminate ========================================================
+%%
+%function Terminate(block, system) Output
+   /* %<Type> Block: %<Name> */
+  
+  %if IsModelReferenceSimTarget() || CodeFormat == "S-Function" || ::isRAccel
+    pfc_sf_Terminate_wrapper_accel();
+  %else
+    pfc_sf_Terminate_wrapper();
+  %endif
+
+%endfunction
 
 %% [EOF] pfc_sf.tlc
 

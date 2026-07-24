@@ -14,7 +14,7 @@
 /*******************************************************************************
 * SOFTWARE LICENSE AGREEMENT
 * 
-* © [2024] Microchip Technology Inc. and its subsidiaries
+* ï¿½ [2024] Microchip Technology Inc. and its subsidiaries
 * 
 * Subject to your compliance with these terms, you may use this Microchip 
 * software and any derivatives exclusively with Microchip products. 
@@ -71,8 +71,10 @@ void PFC_ControllerPIUpdate(PFC_PI_T *pPIParam)
     
     pPIParam->integralOut = pPIParam->integralOut +
                            pPIParam->ki * pPIParam->error;
-    
-    U  = pPIParam->integralOut + pPIParam->kp * pPIParam->error ;
+
+    pPIParam->propOut = pPIParam->kp * pPIParam->error;
+
+    U  = pPIParam->integralOut + pPIParam->propOut ;
 
     if( U > pPIParam->maxOutput )
     {

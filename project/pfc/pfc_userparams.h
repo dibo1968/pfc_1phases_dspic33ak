@@ -15,7 +15,7 @@
 /*******************************************************************************
 * SOFTWARE LICENSE AGREEMENT
 * 
-* © [2024] Microchip Technology Inc. and its subsidiaries
+* ï¿½ [2024] Microchip Technology Inc. and its subsidiaries
 * 
 * Subject to your compliance with these terms, you may use this Microchip 
 * software and any derivatives exclusively with Microchip products. 
@@ -78,7 +78,7 @@
 #endif
 
 /*PFC inductor current offset measurement*/
-#define ENABLE_PFC_CURRENT_OFFSET_CORRECTION
+//#define ENABLE_PFC_CURRENT_OFFSET_CORRECTION
 
 /** When defined, operates in power reference control. 
    That is the voltage PI output correspond to the input power. */
@@ -125,7 +125,34 @@
 		Therefore, maximum current or base current  = 22A */ 
 #define PFC_INPUT_MAX_CURRENT           22.0f
         
-#define ADC_CURRENT_SCALE               (float)(PFC_INPUT_MAX_CURRENT/32768.0f)                
+#define ADC_CURRENT_SCALE               (float)(PFC_INPUT_MAX_CURRENT/32768.0f)
+
+/* Boost inductance in Henry. Must match the value used in the plant model
+ * (L in mchp_pfc_foc_dsPIC33A_data.m). Used by the conduction mode detector
+ * to predict the inductor current slopes.
+ *
+ * NOTE: if the boost choke is a swinging/powder core, L falls with current
+ * and this single constant is only correct at one operating point. The mode
+ * detector degrades gracefully (the boundary shifts slightly), but any
+ * predictive duty computation added later would inherit the error directly. */
+#define PFC_INDUCTANCE                  680e-6f
+
+/* Ts/L, in A per Volt. Folded at compile time. */
+#define PFC_TS_OVER_L                   (float)(PFC_LOOPTIME_SEC/PFC_INDUCTANCE)
+
+/* Selects how the mid-ON current sample is converted to a cycle average
+ * before it reaches the current loop. Values are PFC_DCM_COMP_T (pfc.h):
+ *
+ *   0 = PFC_DCM_COMP_OFF        raw sample, no reconstruction (baseline)
+ *   1 = PFC_DCM_COMP_RATIO      legacy factor = min(d1/D_ideal, 1)
+ *   2 = PFC_DCM_COMP_VALLEY_EST valley-estimation mode detect, then factor
+ *
+ * This only sets the power-on default. The field is writable at run time
+ * (pfcParam.sampleCorrectionEnable), so on hardware the three methods can be
+ * switched from the debugger / X2C Scope without a rebuild. In SiL, change
+ * this and rebuild the S-function. */
+#define PFC_DCM_COMPENSATION_METHOD     2
+
 /* PFC Fault Limits - Input voltage,Input current and Output voltages */
         
 /* PFC Input over current limit in A (rms)*/
@@ -153,11 +180,17 @@
      
 /* Specify PFC output voltage reference in V */
 #define PFC_OUPUT_VOLTAGE_NOMINAL       380.0f
+
+/* Precharge complete threshold in V.
+ * The DC bus charges passively through the diode bridge + inrush resistor
+ * until it reaches ~sqrt(2)*Vac_rms minus diode drops. For 230 Vrms input
+ * this is ~325 V. Trip the relay safely below the expected peak. */
+#define PFC_PRECHARGE_THRESHOLD         280.0f
         
 /* Specify Soft start ramp rate and ramp count .This is specified at the rate 
 of PFC control loop execution rate  */
 #define RAMP_COUNT                      (float)(PFC_VOLTAGE_BASE/32768.0f)
-#define RAMP_RATE                       20
+#define RAMP_RATE                       5
 
 /* Define minimum PFC voltage control output at which PWM duty is applied to 
     the boost power converter. 
@@ -178,8 +211,10 @@ of PFC control loop execution rate  */
     
 /* Define PFC PI parameters */      
 /** PFC Current loop Coefficients */
-#define KP_I                            0.071959f
-#define KI_I                            0.0045213f
+//#define KP_I                            0.071959f
+//#define KI_I                            0.0045213f
+#define KP_I   0.036f      // was 0.071959f
+#define KI_I   0.0022607f  // was 0.0045213f
 #define PI_I_OUT_MAX                    PFC_MAX_DUTY
         
 /** Voltage  loop Coefficients */

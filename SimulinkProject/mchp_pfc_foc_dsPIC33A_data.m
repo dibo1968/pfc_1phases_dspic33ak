@@ -33,7 +33,7 @@ dataType        = 'single';
 %% System Parameters
 %% Simulation Parameters
 %% Set circuit parameters
-Po          = 1500;                             % Output Power of the converter
+Po          = 0.25*1500;                             % Output Power of the converter
 Vout        = 380;                              % Output Voltage
 Vin_rms     = 230;                              % Inout Voltage rms value [ 90V - 250V range]
 Vin_pk      = Vin_rms*1.414;                    % Input Voltage peak value 

@@ -11,7 +11,7 @@
 /*******************************************************************************
 * SOFTWARE LICENSE AGREEMENT
 * 
-* © [2024] Microchip Technology Inc. and its subsidiaries
+* ï¿½ [2024] Microchip Technology Inc. and its subsidiaries
 * 
 * Subject to your compliance with these terms, you may use this Microchip 
 * software and any derivatives exclusively with Microchip products. 
@@ -59,7 +59,9 @@
 // <editor-fold defaultstate="collapsed" desc="Function Declarations ">
 
 static float PFC_SignalRectification(PFC_MEASURE_VOLTAGE_T *);
-static float PFC_CurrentSampleCorrection(PFC_T *);
+static float PFC_DcmAverageFactor(PFC_T *);
+static uint16_t PFC_ConductionModeDetect(PFC_T *);
+static void PFC_CurrentSampleCorrection(PFC_T *);
 static void PFC_Average(PFC_AVG_T *,float);
 static void PFC_SquaredRMSCalculate(PFC_RMS_SQUARE_T *,float);
 
@@ -165,13 +167,24 @@ void PFC_StateMachine(PFC_T *pfcData)
     switch(pfcState)
     {
         case PFC_INIT:
-            
+
             PFC_ResetParams(pfcData);
             HAL_PFCPWMDisableOutputs();
+            PFC_INRUSH_RELAY = 0;
             PFC_MeasureCurrentInit(pCurrent);
-              
-            pfcState = PFC_OFFSET_MEAS;
-            
+
+            pfcState = PFC_PRECHARGE;
+
+        break;
+        case PFC_PRECHARGE:
+            /** Wait for the DC bulk capacitor to charge passively through the
+                diode bridge and the inrush resistor. vdcAVG.output is the
+                moving-average of the measured bus voltage in volts. */
+            if(pfcData->vdcAVG.output >= PFC_PRECHARGE_THRESHOLD)
+            {
+                PFC_INRUSH_RELAY = 1;
+                pfcState = PFC_OFFSET_MEAS;
+            }
         break;
         case PFC_OFFSET_MEAS:
             PFC_MeasureCurrentOffset(pCurrent);
@@ -199,8 +212,11 @@ void PFC_StateMachine(PFC_T *pfcData)
         break;
         case PFC_CTRL_RUN:
             
+            /* Always connect the current feedback to the control loop. */
+            pfcData->iL = pCurrent->iL;
 #ifdef ENABLE_PFC_CURRENT_OFFSET_CORRECTION
-            pfcData->iL = pCurrent->iL - pCurrent->offset;
+            /* Offset correction is an optional adjustment on top of it. */
+            pfcData->iL -= pCurrent->offset;
 #endif
             
             PFC_FaultCheck(pfcData);
@@ -338,7 +354,12 @@ void PFC_ParamsInit(PFC_T *pfcData)
     
     pfcData->state = PFC_INIT;
     pfcData->faultStatus = PFC_FAULT_NONE;
-    pfcData->sampleCorrectionEnable = 0;
+    /* Average-current reconstruction method, see PFC_DCM_COMP_T. Writable at
+     * run time so the methods can be A/B'd on a single build. */
+    pfcData->sampleCorrectionEnable = PFC_DCM_COMPENSATION_METHOD;
+    pfcData->dcmDetected = 0;
+    pfcData->iValleyEst = 0.0f;
+    pfcData->sampleCorrFactor = 1.0f;
 }
 /**
  * <B> Function: PFC_ResetParams(PFC_T *pData)  </B>
@@ -377,37 +398,137 @@ void PFC_ResetParams(PFC_T *pData)
 }
 
 /**
- * <B> Function: PFC_CurrentSampleCorrection(PFC_T *pData)  </B>
- * 
- * @brief Function to calculate average value of current in discontinuous 
- * conduction mode.
+ * <B> Function: PFC_DcmAverageFactor(PFC_T *pData)  </B>
+ *
+ * @brief Ratio between the true cycle-average inductor current and the mid-ON
+ * sample, i.e. the conduction fraction (d1+d2).
  * @param Pointer to the data structure containing PFC related variables
- * @return average current output
+ * @return correction factor in (0,1]
+ * @example
+ * <code>
+ * factor = PFC_DcmAverageFactor(pData);
+ * </code>
+ */
+static float PFC_DcmAverageFactor(PFC_T *pData)
+{
+    /* IL is sampled at mid-ON:
+     *   CCM: the sample already equals the average IL           -> factor 1.
+     *   DCM: the sample is ~Ipk/2, but the cycle-average is LOWER because the
+     *        current idles at zero for part of the period:
+     *          I_avg = (Ipk/2)*(d1+d2) = sample * (d1 / D_ideal),
+     *        with d1 = ON duty (piCurrent.output),
+     *        D_ideal = (Vout-Vin)/Vout = boostDutyRatio, and
+     *        (d1+d2) = d1/D_ideal < 1 in DCM.
+     * Note d2 = d1*Vg/(Vo-Vg) assumes an ideal converter: the diode drop, DCR
+     * and Rds_on all stretch the real demagnetising time slightly. */
+    float factor = 1.0f;
+
+    if (pData->boostDutyRatio > 0.0f)
+    {
+        factor = pData->piCurrent.output / pData->boostDutyRatio;
+
+        /* Losses/transients can push d1 past D_ideal; that must never inflate
+         * the reading, so cap at unity. Under PFC_DCM_COMP_RATIO this cap is
+         * also what decides CCM, which is precisely the weakness that
+         * PFC_DCM_COMP_VALLEY_EST removes. */
+        if (factor > 1.0f)
+        {
+            factor = 1.0f;
+        }
+        else if (factor < 0.0f)
+        {
+            factor = 0.0f;
+        }
+    }
+    return factor;
+}
+/**
+ * <B> Function: PFC_ConductionModeDetect(PFC_T *pData)  </B>
+ *
+ * @brief Detects CCM/DCM by predicting the inductor current at the end of the
+ * OFF time and testing it against zero. Also publishes the estimate itself in
+ * pData->iValleyEst for logging.
+ * @param Pointer to the data structure containing PFC related variables
+ * @return 1 if DCM, 0 if CCM
+ * @example
+ * <code>
+ * pData->dcmDetected = PFC_ConductionModeDetect(pData);
+ * </code>
+ */
+static uint16_t PFC_ConductionModeDetect(PFC_T *pData)
+{
+    const float d  = pData->piCurrent.output;   /* duty that produced this sample */
+    const float vg = pData->rectifiedVac;
+    const float vo = pData->pfcVoltage.vdc;
+
+    /* Walk the CCM current path forward from the mid-ON sample:
+     *    rise over the remaining half of the ON time : +(vg/L)*(d*Ts/2)
+     *    fall over the whole OFF time                : +((vg-vo)/L)*(1-d)*Ts
+     * Collecting terms,
+     *    iValleyEst = i + (Ts/L)*( vg*(1 - d/2) - vo*(1 - d) )
+     *
+     * In CCM the current really does follow that path, so the estimate is the
+     * actual valley and is >= 0. In DCM the current hits zero before the OFF
+     * time is up and then sits there, so the continued-slope estimate
+     * undershoots into negative territory.
+     *
+     * The point of doing it this way is the threshold: it is a FIXED zero, not
+     * a sampled quantity. Comparing an estimate against a sample (which is what
+     * the min(d1/D_ideal,1) clamp effectively does) makes the decision jitter
+     * on sample noise right at the boundary, and every toggle is a duty
+     * discontinuity that shows up as input current distortion. */
+    pData->iValleyEst = pData->iL
+                      + (PFC_TS_OVER_L * ((vg * (1.0f - (0.5f * d)))
+                                        - (vo * (1.0f - d))));
+
+    return (pData->iValleyEst < 0.0f) ? 1u : 0u;
+}
+/**
+ * <B> Function: PFC_CurrentSampleCorrection(PFC_T *pData)  </B>
+ *
+ * @brief Function to calculate average value of current in discontinuous
+ * conduction mode. Writes averageCurrent, dcmDetected, iValleyEst and
+ * sampleCorrFactor.
+ * @param Pointer to the data structure containing PFC related variables
+ * @return none
  * @example
  * <code>
  * PFC_CurrentSampleCorrection(PFC_T *pData);
  * </code>
  */
-static float PFC_CurrentSampleCorrection(PFC_T *pData)
+static void PFC_CurrentSampleCorrection(PFC_T *pData)
 {
-    float output;
-    
-    /** Check if ideal duty is positive value */
-    if(pData->boostDutyRatio > 0)
+    /* Always evaluated, whichever method is driving the loop, so that one run
+     * shows what valley estimation would have decided even when it is not the
+     * active method. Costs a handful of flops. */
+    const uint16_t dcmByValley = PFC_ConductionModeDetect(pData);
+
+    switch (pData->sampleCorrectionEnable)
     {
-        /** Calculate ratio of actual duty and ideal duty */
-        output = (pData->piCurrent.output/pData->boostDutyRatio);
+        case PFC_DCM_COMP_RATIO:
+            /* Legacy: the unity cap is the mode decision. Report DCM whenever
+             * the cap did not bind, so dcmDetected is directly comparable
+             * against the valley method's answer. */
+            pData->sampleCorrFactor = PFC_DcmAverageFactor(pData);
+            pData->dcmDetected = (pData->sampleCorrFactor < 1.0f) ? 1u : 0u;
+            break;
+
+        case PFC_DCM_COMP_VALLEY_EST:
+            /* Detect first, then correct only if DCM was actually detected. */
+            pData->dcmDetected = dcmByValley;
+            pData->sampleCorrFactor = (dcmByValley != 0u)
+                                    ? PFC_DcmAverageFactor(pData)
+                                    : 1.0f;
+            break;
+
+        case PFC_DCM_COMP_OFF:
+        default:
+            pData->dcmDetected = 0u;
+            pData->sampleCorrFactor = 1.0f;
+            break;
     }
-    /** Check if ratio previous result is greater than 0 */
-    if(output > 0)
-    {
-        output = (float)(pData->iL*output);
-    }
-    else
-    {
-        output = pData->iL;
-    }
-    return(output);
+
+    pData->averageCurrent = pData->iL * pData->sampleCorrFactor;
 }
 /**
  * <B> Function: PFC_CurrentControlLoop(PFC_T *pData)  </B>
@@ -429,19 +550,18 @@ inline static void PFC_CurrentControlLoop(PFC_T *pData)
     {
         pData->iL  = 0.0001;
     }
-    /** Calculate average current if converter operates in discontinuous 
-        conduction mode. In continuous conduction mode, measured current is 
-        used as is ,as average current is obtained */
-    if (pData->sampleCorrectionEnable == 1)
-    {
-        pData->averageCurrent = PFC_CurrentSampleCorrection(pData);
-    }
-    else
-    {
-        pData->averageCurrent = pData->iL;
-    }
+    /** Calculate average current if converter operates in discontinuous
+        conduction mode. In continuous conduction mode, measured current is
+        used as is ,as average current is obtained. The method is selected by
+        pData->sampleCorrectionEnable (PFC_DCM_COMP_T). */
+    PFC_CurrentSampleCorrection(pData);
+
+    /* Populate the reference/input fields for logging. The PI update only
+     * consumes .error, so these are purely for a self-describing bus. */
+    pData->piCurrent.reference = pData->currentReference;
+    pData->piCurrent.input     = pData->averageCurrent;
     pData->piCurrent.error = (pData->currentReference - pData->averageCurrent);
-    
+
     PFC_ControllerPIUpdate(&pData->piCurrent);
     
     /** Calculate duty cycle of PWM that controls PFC in terms of PWM Period */
@@ -487,6 +607,9 @@ inline static void PFC_CurrentRefGenerate(PFC_T *pData)
         {
             pData->piVoltage.ki = KI_V;
         }
+        /* Record the measurement for a self-describing bus; the reference is
+         * already set by the soft-start ramp. */
+        pData->piVoltage.input = pData->vdcAVG.output;
         PFC_ControllerPIUpdate(&pData->piVoltage);
         pData->voltLoopExeRate = 0;
     }

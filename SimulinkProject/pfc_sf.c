@@ -26,7 +26,7 @@
  * | See matlabroot/simulink/src/sfuntmpl_doc.c for a more detailed template |
  *  -------------------------------------------------------------------------
  *
- * Created: Wed May 13 20:15:52 2026
+ * Created: Thu Jul 23 08:11:62 2026
  */
 
 #define S_FUNCTION_LEVEL               2
@@ -115,7 +115,7 @@
 #define IN_3_FRACTIONLENGTH            3
 #define IN_3_BIAS                      0
 #define IN_3_SLOPE                     0.125
-#define NUM_OUTPUTS                    7
+#define NUM_OUTPUTS                    9
 
 /* Output Port  0 */
 #define OUT_PORT_0_NAME                state_out
@@ -249,6 +249,44 @@
 #define OUT_6_FRACTIONLENGTH           3
 #define OUT_6_BIAS                     0
 #define OUT_6_SLOPE                    0.125
+
+/* Output Port  7 */
+#define OUT_PORT_7_NAME                SiL_Out_PFC_INRUSH_RELAY
+#define OUTPUT_7_DIMS_ND               {1,1}
+#define OUTPUT_7_NUM_ELEMS             1
+#define OUTPUT_7_WIDTH                 1
+#define OUTPUT_DIMS_7_COL              1
+#define OUTPUT_7_DTYPE                 boolean_T
+#define OUTPUT_7_COMPLEX               COMPLEX_NO
+#define OUTPUT_7_UNIT                  ""
+#define OUT_7_BUS_BASED                0
+#define OUT_7_BUS_NAME
+#define OUT_7_DIMS                     1-D
+#define OUT_7_ISSIGNED                 1
+#define OUT_7_WORDLENGTH               8
+#define OUT_7_FIXPOINTSCALING          1
+#define OUT_7_FRACTIONLENGTH           3
+#define OUT_7_BIAS                     0
+#define OUT_7_SLOPE                    0.125
+
+/* Output Port  8 */
+#define OUT_PORT_8_NAME                pfcParam_out
+#define OUTPUT_8_DIMS_ND               {1,1}
+#define OUTPUT_8_NUM_ELEMS             1
+#define OUTPUT_8_WIDTH                 1
+#define OUTPUT_DIMS_8_COL              1
+#define OUTPUT_8_DTYPE                 Bus:PFC_Bus
+#define OUTPUT_8_COMPLEX               COMPLEX_NO
+#define OUTPUT_8_UNIT                  ""
+#define OUT_8_BUS_BASED                1
+#define OUT_8_BUS_NAME                 PFC_T_Bus
+#define OUT_8_DIMS                     1-D
+#define OUT_8_ISSIGNED                 1
+#define OUT_8_WORDLENGTH               8
+#define OUT_8_FIXPOINTSCALING          1
+#define OUT_8_FRACTIONLENGTH           3
+#define OUT_8_BIAS                     0
+#define OUT_8_SLOPE                    0.125
 #define NPARAMS                        0
 #define SAMPLE_TIME_0                  INHERITED_SAMPLE_TIME
 #define NUM_DISC_STATES                0
@@ -256,8 +294,8 @@
 #define NUM_CONT_STATES                0
 #define CONT_STATES_IC                 [0]
 #define SFUNWIZ_GENERATE_TLC           1
-#define SOURCEFILES                    "__SFB__INC_PATH ..\project\pfc__SFB__"
-#define PANELINDEX                     N/A
+#define SOURCEFILES                    "__SFB__INC_PATH C:\Users\Andy\Documents\PFC\pfc_1phases_dspic33ak\project\pfc__SFB__INC_PATH C:\Users\Andy\Documents\PFC\pfc_1phases_dspic33ak\SimulinkProject__SFB__INC_PATH c:\Users\Andy\Documents\PFC\pfc_1phases_dspic33ak\project\hal\"
+#define PANELINDEX N/A
 #define USE_SIMSTRUCT                  0
 #define SHOW_COMPILE_STEPS             0
 #define CREATE_DEBUG_MEXFILE           0
@@ -267,6 +305,24 @@
 /* %%%-SFUNWIZ_defines_Changes_END --- EDIT HERE TO _BEGIN */
 /*<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 #include "simstruc.h"
+#include "pfc_sf_bus.h"
+
+/*
+ * Code Generation Environment flag (simulation or standalone target).
+ */
+static int_T isSimulationTarget;
+
+/* Utility function prototypes. */
+static int_T GetRTWEnvironmentMode(SimStruct *S);
+
+/* Macro used to check if Simulation mode is set to accelerator */
+#define isBusDWorkPresent              ( ( ( !ssRTWGenIsCodeGen(S) || isSimulationTarget ) && !ssIsExternalSim(S) ) || ssIsRapidAcceleratorActive(S) )
+
+typedef struct {
+  int_T offset;
+  int_T elemSize;
+  int_T numElems;
+} busInfoStruct;
 
 extern void pfc_sf_Start_wrapper(void);
 extern void pfc_sf_Outputs_wrapper(const real32_T *Vdc_in,
@@ -279,7 +335,10 @@ extern void pfc_sf_Outputs_wrapper(const real32_T *Vdc_in,
   real32_T *test2,
   real32_T *pwm_fac,
   real32_T *pfcParam_piVoltage_out,
-  real32_T *pfcParam_piCurrent_out);
+  real32_T *pfcParam_piCurrent_out,
+  boolean_T *SiL_Out_PFC_INRUSH_RELAY,
+  PFC_T_Bus *pfcParam_out);
+extern void pfc_sf_Terminate_wrapper(void);
 
 /*====================*
  * S-function methods *
@@ -426,6 +485,32 @@ static void mdlInitializeSizes(SimStruct *S)
   ssSetOutputPortDataType(S, 6, SS_SINGLE);
   ssSetOutputPortComplexSignal(S, 6, OUTPUT_6_COMPLEX);
 
+  /* Output Port 7 */
+  ssSetOutputPortWidth(S, 7, OUTPUT_7_NUM_ELEMS);
+  ssSetOutputPortDataType(S, 7, SS_BOOLEAN);
+  ssSetOutputPortComplexSignal(S, 7, OUTPUT_7_COMPLEX);
+
+  /* Output Port 8 */
+
+  /* Register PFC_T_Bus datatype for Output port 8 */
+#if defined(MATLAB_MEX_FILE)
+
+  if (ssGetSimMode(S) != SS_SIMMODE_SIZES_CALL_ONLY) {
+    DTypeId dataTypeIdReg;
+    ssRegisterTypeFromNamedObject(S, "PFC_T_Bus", &dataTypeIdReg);
+    if (dataTypeIdReg == INVALID_DTYPE_ID)
+      return;
+    ssSetOutputPortDataType(S, 8, dataTypeIdReg);
+  }
+
+#endif
+
+  ssSetOutputPortWidth(S, 8, OUTPUT_8_NUM_ELEMS);
+  ssSetBusOutputObjectName(S, 8, (void *) "PFC_T_Bus");
+  ssSetOutputPortComplexSignal(S, 8, OUTPUT_8_COMPLEX);
+  ssSetBusOutputAsStruct(S, 8,OUT_8_BUS_BASED);
+  ssSetOutputPortBusMode(S, 8, SL_BUS_MODE);
+
   /*
    * Configure the Units for Output Ports
    */
@@ -497,17 +582,73 @@ static void mdlInitializeSizes(SimStruct *S)
       return;
     }
 
+    ssRegisterUnitFromExpr(S, OUTPUT_7_UNIT, &outUnitIdReg);
+    if (outUnitIdReg != INVALID_UNIT_ID) {
+      ssSetOutputPortUnit(S, 7, outUnitIdReg);
+    } else {
+      ssSetLocalErrorStatus(S,
+                            "Invalid Unit provided for output port SiL_Out_PFC_INRUSH_RELAY of S-Function pfc_sf");
+      return;
+    }
+
+    ssRegisterUnitFromExpr(S, OUTPUT_8_UNIT, &outUnitIdReg);
+    if (outUnitIdReg != INVALID_UNIT_ID) {
+      ssSetOutputPortUnit(S, 8, outUnitIdReg);
+    } else {
+      ssSetLocalErrorStatus(S,
+                            "Invalid Unit provided for output port pfcParam_out of S-Function pfc_sf");
+      return;
+    }
+
 #endif
 
   }
 
+  if (ssRTWGenIsCodeGen(S)) {
+    isSimulationTarget = GetRTWEnvironmentMode(S);
+    if (isSimulationTarget == -1) {
+      ssSetLocalErrorStatus(S,
+                            " Unable to determine a valid code generation environment mode");
+      return;
+    }
+
+    isSimulationTarget |= ssRTWGenIsModelReferenceSimTarget(S);
+  }
+
+  /* Set the number of dworks */
+  if (!ssSetNumDWork(S, 1))
+    return;
+
+  /*
+   * Configure the dwork 0 (pfcParam_outBUS)
+   */
+#if defined(MATLAB_MEX_FILE)
+
+  if (ssGetSimMode(S) != SS_SIMMODE_SIZES_CALL_ONLY) {
+    DTypeId dataTypeIdReg;
+    ssRegisterTypeFromNamedObject(S, "PFC_T_Bus", &dataTypeIdReg);
+    if (dataTypeIdReg == INVALID_DTYPE_ID)
+      return;
+    if (isBusDWorkPresent) {
+      ssSetDWorkDataType(S, 0, dataTypeIdReg);
+    } else {
+      ssSetDWorkDataType(S, 0, SS_POINTER);
+    }
+  }
+
+#endif
+
+  ssSetDWorkUsageType(S, 0, SS_DWORK_USED_AS_DWORK);
+  ssSetDWorkName(S, 0, "pfcParam_outBUS");
+  ssSetDWorkWidth(S, 0, DYNAMICALLY_SIZED);
+  ssSetDWorkComplexSignal(S, 0, COMPLEX_NO);
   ssSetNumPWork(S, 0);
   ssSetNumSampleTimes(S, 1);
   ssSetNumRWork(S, 0);
   ssSetNumIWork(S, 0);
   ssSetNumModes(S, 0);
   ssSetNumNonsampledZCs(S, 0);
-  ssSetSimulinkVersionGeneratedIn(S, "25.2");
+  ssSetSimulinkVersionGeneratedIn(S, "26.1");
 
   /* Take care when specifying exception free code - see sfuntmpl_doc.c */
   ssSetRuntimeThreadSafetyCompliance(S, RUNTIME_THREAD_SAFETY_COMPLIANCE_FALSE);
@@ -603,6 +744,22 @@ static void mdlSetDefaultPortDataTypes(SimStruct *S)
   ssSetOutputPortDataType(S, 0, SS_DOUBLE);
 }
 
+#define MDL_SET_WORK_WIDTHS
+#if defined(MDL_SET_WORK_WIDTHS) && defined(MATLAB_MEX_FILE)
+
+static void mdlSetWorkWidths(SimStruct *S)
+{
+  /* Set the width of DWork(s) used for marshalling the IOs */
+  if (isBusDWorkPresent) {
+    /* Update dwork 0 */
+    ssSetDWorkWidth(S, 0, ssGetOutputPortWidth(S, 8));
+  } else {
+    ssSetDWorkWidth(S, 0, 1);
+  }
+}
+
+#endif
+
 #define MDL_START                                                /* Change to #undef to remove function */
 #if defined(MDL_START)
 
@@ -614,6 +771,238 @@ static void mdlSetDefaultPortDataTypes(SimStruct *S)
  */
 static void mdlStart(SimStruct *S)
 {
+  /* Bus Information */
+  slDataTypeAccess *dta = ssGetDataTypeAccess(S);
+  const char *bpath = ssGetPath(S);
+  DTypeId PFC_AVG_T_BusId = ssGetDataTypeId(S,"PFC_AVG_T_Bus");
+  DTypeId PFC_MEASURE_CURRENT_T_BusId = ssGetDataTypeId(S,
+    "PFC_MEASURE_CURRENT_T_Bus");
+  DTypeId PFC_MEASURE_VOLTAGE_T_BusId = ssGetDataTypeId(S,
+    "PFC_MEASURE_VOLTAGE_T_Bus");
+  DTypeId PFC_PI_T_BusId = ssGetDataTypeId(S,"PFC_PI_T_Bus");
+  DTypeId PFC_RMS_SQUARE_T_BusId = ssGetDataTypeId(S,"PFC_RMS_SQUARE_T_Bus");
+  DTypeId PFC_T_BusId = ssGetDataTypeId(S,"PFC_T_Bus");
+  busInfoStruct *busInfo = (busInfoStruct *)malloc(85*sizeof(busInfoStruct));
+  if (busInfo==NULL) {
+    ssSetLocalErrorStatus(S, "Memory allocation failure");
+    return;
+  }
+
+  /*offsets info for all unique bus structures*/
+  busInfo[0].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 0);
+  busInfo[0].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT32);
+  busInfo[0].numElems = 1;
+  busInfo[1].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 1);
+  busInfo[1].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[1].numElems = 1;
+  busInfo[2].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 2);
+  busInfo[2].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[2].numElems = 1;
+  busInfo[3].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 3);
+  busInfo[3].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[3].numElems = 1;
+  busInfo[4].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 4);
+  busInfo[4].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[4].numElems = 1;
+  busInfo[5].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 5);
+  busInfo[5].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[5].numElems = 1;
+  busInfo[6].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 6);
+  busInfo[6].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[6].numElems = 1;
+  busInfo[7].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 7);
+  busInfo[7].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[7].numElems = 1;
+  busInfo[8].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 8);
+  busInfo[8].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[8].numElems = 1;
+  busInfo[9].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 9);
+  busInfo[9].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[9].numElems = 1;
+  busInfo[10].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 10);
+  busInfo[10].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[10].numElems = 1;
+  busInfo[11].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 11);
+  busInfo[11].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[11].numElems = 1;
+  busInfo[12].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 12);
+  busInfo[12].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_AVG_T_BusId);
+  busInfo[12].numElems = 1;
+  busInfo[13].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_AVG_T_BusId,
+    0);
+  busInfo[13].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[13].numElems = 1;
+  busInfo[14].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_AVG_T_BusId,
+    1);
+  busInfo[14].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[14].numElems = 1;
+  busInfo[15].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_AVG_T_BusId,
+    2);
+  busInfo[15].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[15].numElems = 1;
+  busInfo[16].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_AVG_T_BusId,
+    3);
+  busInfo[16].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[16].numElems = 1;
+  busInfo[17].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_AVG_T_BusId,
+    4);
+  busInfo[17].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[17].numElems = 1;
+  busInfo[18].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_AVG_T_BusId,
+    5);
+  busInfo[18].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[18].numElems = 1;
+  busInfo[19].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 13);
+  busInfo[19].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_AVG_T_BusId);
+  busInfo[19].numElems = 1;
+  busInfo[26].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 14);
+  busInfo[26].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_RMS_SQUARE_T_BusId);
+  busInfo[26].numElems = 1;
+  busInfo[27].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_RMS_SQUARE_T_BusId, 0);
+  busInfo[27].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[27].numElems = 1;
+  busInfo[28].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_RMS_SQUARE_T_BusId, 1);
+  busInfo[28].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[28].numElems = 1;
+  busInfo[29].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_RMS_SQUARE_T_BusId, 2);
+  busInfo[29].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[29].numElems = 1;
+  busInfo[30].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_RMS_SQUARE_T_BusId, 3);
+  busInfo[30].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[30].numElems = 1;
+  busInfo[31].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_RMS_SQUARE_T_BusId, 4);
+  busInfo[31].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[31].numElems = 1;
+  busInfo[32].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_RMS_SQUARE_T_BusId, 5);
+  busInfo[32].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[32].numElems = 1;
+  busInfo[33].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_RMS_SQUARE_T_BusId, 6);
+  busInfo[33].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[33].numElems = 1;
+  busInfo[34].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 15);
+  busInfo[34].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_PI_T_BusId);
+  busInfo[34].numElems = 1;
+  busInfo[35].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 0);
+  busInfo[35].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[35].numElems = 1;
+  busInfo[36].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 1);
+  busInfo[36].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[36].numElems = 1;
+  busInfo[37].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 2);
+  busInfo[37].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[37].numElems = 1;
+  busInfo[38].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 3);
+  busInfo[38].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[38].numElems = 1;
+  busInfo[39].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 4);
+  busInfo[39].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[39].numElems = 1;
+  busInfo[40].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 5);
+  busInfo[40].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[40].numElems = 1;
+  busInfo[41].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 6);
+  busInfo[41].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[41].numElems = 1;
+  busInfo[42].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 7);
+  busInfo[42].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[42].numElems = 1;
+  busInfo[43].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 8);
+  busInfo[43].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[43].numElems = 1;
+  busInfo[44].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId, 9);
+  busInfo[44].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[44].numElems = 1;
+  busInfo[45].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId,
+    10);
+  busInfo[45].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[45].numElems = 1;
+  busInfo[46].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_PI_T_BusId,
+    11);
+  busInfo[46].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[46].numElems = 1;
+  busInfo[47].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 16);
+  busInfo[47].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_PI_T_BusId);
+  busInfo[47].numElems = 1;
+  busInfo[60].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 17);
+  busInfo[60].elemSize = dtaGetDataTypeSize(dta, bpath, SS_INT32);
+  busInfo[60].numElems = 1;
+  busInfo[61].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 18);
+  busInfo[61].elemSize = dtaGetDataTypeSize(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId);
+  busInfo[61].numElems = 1;
+  busInfo[62].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId, 0);
+  busInfo[62].elemSize = dtaGetDataTypeSize(dta, bpath, SS_INT16);
+  busInfo[62].numElems = 1;
+  busInfo[63].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId, 1);
+  busInfo[63].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[63].numElems = 1;
+  busInfo[64].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId, 2);
+  busInfo[64].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[64].numElems = 1;
+  busInfo[65].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId, 3);
+  busInfo[65].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[65].numElems = 1;
+  busInfo[66].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId, 4);
+  busInfo[66].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[66].numElems = 1;
+  busInfo[67].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId, 5);
+  busInfo[67].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[67].numElems = 1;
+  busInfo[68].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 19);
+  busInfo[68].elemSize = dtaGetDataTypeSize(dta, bpath,
+    PFC_MEASURE_CURRENT_T_BusId);
+  busInfo[68].numElems = 1;
+  busInfo[75].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 20);
+  busInfo[75].elemSize = dtaGetDataTypeSize(dta, bpath,
+    PFC_MEASURE_VOLTAGE_T_BusId);
+  busInfo[75].numElems = 1;
+  busInfo[76].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_VOLTAGE_T_BusId, 0);
+  busInfo[76].elemSize = dtaGetDataTypeSize(dta, bpath, SS_INT16);
+  busInfo[76].numElems = 1;
+  busInfo[77].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_VOLTAGE_T_BusId, 1);
+  busInfo[77].elemSize = dtaGetDataTypeSize(dta, bpath, SS_INT16);
+  busInfo[77].numElems = 1;
+  busInfo[78].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_VOLTAGE_T_BusId, 2);
+  busInfo[78].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[78].numElems = 1;
+  busInfo[79].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_VOLTAGE_T_BusId, 3);
+  busInfo[79].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[79].numElems = 1;
+  busInfo[80].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_MEASURE_VOLTAGE_T_BusId, 4);
+  busInfo[80].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[80].numElems = 1;
+  busInfo[81].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 21);
+  busInfo[81].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[81].numElems = 1;
+  busInfo[82].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 22);
+  busInfo[82].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[82].numElems = 1;
+  busInfo[83].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 23);
+  busInfo[83].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[83].numElems = 1;
+  busInfo[84].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_T_BusId);
+  busInfo[84].numElems = ssGetOutputPortWidth(S, 8);
+  ssSetUserData(S, busInfo);
+
+  /* Allocate memory for arrays or nested arrays of buses DWork pointers */
   pfc_sf_Start_wrapper();
 }
 
@@ -635,9 +1024,176 @@ static void mdlOutputs(SimStruct *S, int_T tid)
   real32_T *pwm_fac = (real32_T *) ssGetOutputPortRealSignal(S, 4);
   real32_T *pfcParam_piVoltage_out = (real32_T *) ssGetOutputPortRealSignal(S, 5);
   real32_T *pfcParam_piCurrent_out = (real32_T *) ssGetOutputPortRealSignal(S, 6);
+  boolean_T *SiL_Out_PFC_INRUSH_RELAY = (boolean_T *) ssGetOutputPortRealSignal
+    (S, 7);
+  char *pfcParam_out = (char *) ssGetOutputPortSignal(S, 8);
+  busInfoStruct* busInfo = (busInfoStruct *) ssGetUserData(S);
+
+  /* Temporary bus copy declarations */
+  PFC_T_Bus _pfcParam_outBUS;
+  slDataTypeAccess *dta = ssGetDataTypeAccess(S);
+  const char *bpath = ssGetPath(S);
+
+  /*Copy from Simulink to bus structure*/
   pfc_sf_Outputs_wrapper(Vdc_in, Vac_in, Il_in, Iout_in, state_out,
     fault_status_out, test1, test2, pwm_fac, pfcParam_piVoltage_out,
-    pfcParam_piCurrent_out);
+    pfcParam_piCurrent_out, SiL_Out_PFC_INRUSH_RELAY, &_pfcParam_outBUS);
+
+  /*Copy from bus structure to Simulink*/
+
+  /*Copy from _pfcParam_outBUS to Simulink for Output port 8*/
+  *((uint32_T*)((char *) pfcParam_out + busInfo[0].offset)) = (_pfcParam_outBUS)
+    .duty;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[1].offset)) = (_pfcParam_outBUS)
+    .samplePoint;
+  *((real32_T*)((char *) pfcParam_out + busInfo[2].offset)) = (_pfcParam_outBUS)
+    .averageCurrent;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[3].offset)) = (_pfcParam_outBUS)
+    .rampRate;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[4].offset)) = (_pfcParam_outBUS)
+    .voltLoopExeRate;
+  *((real32_T*)((char *) pfcParam_out + busInfo[5].offset)) = (_pfcParam_outBUS)
+    .boostDutyRatio;
+  *((real32_T*)((char *) pfcParam_out + busInfo[6].offset)) = (_pfcParam_outBUS)
+    .currentReference;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[7].offset)) = (_pfcParam_outBUS)
+    .faultStatus;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[8].offset)) = (_pfcParam_outBUS)
+    .sampleCorrectionEnable;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[9].offset)) = (_pfcParam_outBUS)
+    .dcmDetected;
+  *((real32_T*)((char *) pfcParam_out + busInfo[10].offset)) = (_pfcParam_outBUS)
+    .iValleyEst;
+  *((real32_T*)((char *) pfcParam_out + busInfo[11].offset)) = (_pfcParam_outBUS)
+    .sampleCorrFactor;
+  *((real32_T*)((char *) pfcParam_out + busInfo[12].offset + busInfo[13].offset))
+    = (_pfcParam_outBUS).vdcAVG.sum;
+  *((real32_T*)((char *) pfcParam_out + busInfo[12].offset + busInfo[14].offset))
+    = (_pfcParam_outBUS).vdcAVG.output;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[12].offset + busInfo[15].offset))
+    = (_pfcParam_outBUS).vdcAVG.scaler;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[12].offset + busInfo[16].offset))
+    = (_pfcParam_outBUS).vdcAVG.samples;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[12].offset + busInfo[17].offset))
+    = (_pfcParam_outBUS).vdcAVG.sampleLimit;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[12].offset + busInfo[18].offset))
+    = (_pfcParam_outBUS).vdcAVG.status;
+  *((real32_T*)((char *) pfcParam_out + busInfo[19].offset + busInfo[13].offset))
+    = (_pfcParam_outBUS).vacAVG.sum;
+  *((real32_T*)((char *) pfcParam_out + busInfo[19].offset + busInfo[14].offset))
+    = (_pfcParam_outBUS).vacAVG.output;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[19].offset + busInfo[15].offset))
+    = (_pfcParam_outBUS).vacAVG.scaler;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[19].offset + busInfo[16].offset))
+    = (_pfcParam_outBUS).vacAVG.samples;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[19].offset + busInfo[17].offset))
+    = (_pfcParam_outBUS).vacAVG.sampleLimit;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[19].offset + busInfo[18].offset))
+    = (_pfcParam_outBUS).vacAVG.status;
+  *((real32_T*)((char *) pfcParam_out + busInfo[26].offset + busInfo[27].offset))
+    = (_pfcParam_outBUS).vacRMS.sqrOutput;
+  *((real32_T*)((char *) pfcParam_out + busInfo[26].offset + busInfo[28].offset))
+    = (_pfcParam_outBUS).vacRMS.sum;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[26].offset + busInfo[29].offset))
+    = (_pfcParam_outBUS).vacRMS.samples;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[26].offset + busInfo[30].offset))
+    = (_pfcParam_outBUS).vacRMS.sampleLimit;
+  *((real32_T*)((char *) pfcParam_out + busInfo[26].offset + busInfo[31].offset))
+    = (_pfcParam_outBUS).vacRMS.peak;
+  *((real32_T*)((char *) pfcParam_out + busInfo[26].offset + busInfo[32].offset))
+    = (_pfcParam_outBUS).vacRMS.peakcheck;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[26].offset + busInfo[33].offset))
+    = (_pfcParam_outBUS).vacRMS.status;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[35].offset))
+    = (_pfcParam_outBUS).piVoltage.output;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[36].offset))
+    = (_pfcParam_outBUS).piVoltage.integralOut;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[37].offset))
+    = (_pfcParam_outBUS).piVoltage.propOut;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[38].offset))
+    = (_pfcParam_outBUS).piVoltage.input;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[39].offset))
+    = (_pfcParam_outBUS).piVoltage.reference;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[40].offset))
+    = (_pfcParam_outBUS).piVoltage.error;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[41].offset))
+    = (_pfcParam_outBUS).piVoltage.kp;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[42].offset))
+    = (_pfcParam_outBUS).piVoltage.ki;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[43].offset))
+    = (_pfcParam_outBUS).piVoltage.kpScale;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[44].offset))
+    = (_pfcParam_outBUS).piVoltage.kiScale;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[45].offset))
+    = (_pfcParam_outBUS).piVoltage.minOutput;
+  *((real32_T*)((char *) pfcParam_out + busInfo[34].offset + busInfo[46].offset))
+    = (_pfcParam_outBUS).piVoltage.maxOutput;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[35].offset))
+    = (_pfcParam_outBUS).piCurrent.output;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[36].offset))
+    = (_pfcParam_outBUS).piCurrent.integralOut;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[37].offset))
+    = (_pfcParam_outBUS).piCurrent.propOut;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[38].offset))
+    = (_pfcParam_outBUS).piCurrent.input;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[39].offset))
+    = (_pfcParam_outBUS).piCurrent.reference;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[40].offset))
+    = (_pfcParam_outBUS).piCurrent.error;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[41].offset))
+    = (_pfcParam_outBUS).piCurrent.kp;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[42].offset))
+    = (_pfcParam_outBUS).piCurrent.ki;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[43].offset))
+    = (_pfcParam_outBUS).piCurrent.kpScale;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[44].offset))
+    = (_pfcParam_outBUS).piCurrent.kiScale;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[45].offset))
+    = (_pfcParam_outBUS).piCurrent.minOutput;
+  *((real32_T*)((char *) pfcParam_out + busInfo[47].offset + busInfo[46].offset))
+    = (_pfcParam_outBUS).piCurrent.maxOutput;
+  *((int32_T*)((char *) pfcParam_out + busInfo[60].offset)) = (_pfcParam_outBUS)
+    .state;
+  *((int16_T*)((char *) pfcParam_out + busInfo[61].offset + busInfo[62].offset))
+    = (_pfcParam_outBUS).pfcCurrent.inductorCurrent;
+  *((real32_T*)((char *) pfcParam_out + busInfo[61].offset + busInfo[63].offset))
+    = (_pfcParam_outBUS).pfcCurrent.iL;
+  *((real32_T*)((char *) pfcParam_out + busInfo[61].offset + busInfo[64].offset))
+    = (_pfcParam_outBUS).pfcCurrent.offset;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[61].offset + busInfo[65].offset))
+    = (_pfcParam_outBUS).pfcCurrent.counter;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[61].offset + busInfo[66].offset))
+    = (_pfcParam_outBUS).pfcCurrent.status;
+  *((real32_T*)((char *) pfcParam_out + busInfo[61].offset + busInfo[67].offset))
+    = (_pfcParam_outBUS).pfcCurrent.sum;
+  *((int16_T*)((char *) pfcParam_out + busInfo[68].offset + busInfo[62].offset))
+    = (_pfcParam_outBUS).pfcCurrent2.inductorCurrent;
+  *((real32_T*)((char *) pfcParam_out + busInfo[68].offset + busInfo[63].offset))
+    = (_pfcParam_outBUS).pfcCurrent2.iL;
+  *((real32_T*)((char *) pfcParam_out + busInfo[68].offset + busInfo[64].offset))
+    = (_pfcParam_outBUS).pfcCurrent2.offset;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[68].offset + busInfo[65].offset))
+    = (_pfcParam_outBUS).pfcCurrent2.counter;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[68].offset + busInfo[66].offset))
+    = (_pfcParam_outBUS).pfcCurrent2.status;
+  *((real32_T*)((char *) pfcParam_out + busInfo[68].offset + busInfo[67].offset))
+    = (_pfcParam_outBUS).pfcCurrent2.sum;
+  *((int16_T*)((char *) pfcParam_out + busInfo[75].offset + busInfo[76].offset))
+    = (_pfcParam_outBUS).pfcVoltage.acVoltage;
+  *((int16_T*)((char *) pfcParam_out + busInfo[75].offset + busInfo[77].offset))
+    = (_pfcParam_outBUS).pfcVoltage.outputVoltage;
+  *((real32_T*)((char *) pfcParam_out + busInfo[75].offset + busInfo[78].offset))
+    = (_pfcParam_outBUS).pfcVoltage.vac;
+  *((real32_T*)((char *) pfcParam_out + busInfo[75].offset + busInfo[79].offset))
+    = (_pfcParam_outBUS).pfcVoltage.offsetVac;
+  *((real32_T*)((char *) pfcParam_out + busInfo[75].offset + busInfo[80].offset))
+    = (_pfcParam_outBUS).pfcVoltage.vdc;
+  *((real32_T*)((char *) pfcParam_out + busInfo[81].offset)) = (_pfcParam_outBUS)
+    .iL;
+  *((real32_T*)((char *) pfcParam_out + busInfo[82].offset)) = (_pfcParam_outBUS)
+    .rectifiedVac;
+  *((real32_T*)((char *) pfcParam_out + busInfo[83].offset)) = (_pfcParam_outBUS)
+    .outputVdc;
 }
 
 /* Function: mdlTerminate =====================================================
@@ -648,6 +1204,61 @@ static void mdlOutputs(SimStruct *S, int_T tid)
  */
 static void mdlTerminate(SimStruct *S)
 {
+  pfc_sf_Terminate_wrapper();
+
+  /* Free stored bus information */
+  busInfoStruct *busInfo = (busInfoStruct *) ssGetUserData(S);
+  if (busInfo != NULL) {
+    free(busInfo);
+  }
+
+  if (!isBusDWorkPresent) {
+  }
+}
+
+static int_T GetRTWEnvironmentMode(SimStruct *S)
+{
+  int_T status = -1;
+  mxArray *plhs[1];
+  mxArray *prhs[1];
+  mxArray * err;
+
+  /*
+   * Get the name of the Simulink block diagram
+   */
+  prhs[0] = mxCreateString(ssGetBlockDiagramName(S));
+  plhs[0] = NULL;
+
+  /*
+   * Call "isSimulationTarget = rtwenvironmentmode(modelName)" in MATLAB
+   */
+  err = mexCallMATLABWithTrap(1, plhs, 1, prhs, "rtwenvironmentmode");
+  mxDestroyArray(prhs[0]);
+
+  /*
+   * Set the error status if an error occurred
+   */
+  if (err) {
+    if (plhs[0]) {
+      mxDestroyArray(plhs[0]);
+      plhs[0] = NULL;
+    }
+
+    ssSetLocalErrorStatus(S,
+                          "Unknown error during call to 'rtwenvironmentmode'.");
+    return -1;
+  }
+
+  /*
+   * Get the value returned by rtwenvironmentmode(modelName)
+   */
+  if (plhs[0]) {
+    status = (int_T) (mxGetScalar(plhs[0]) != 0);
+    mxDestroyArray(plhs[0]);
+    plhs[0] = NULL;
+  }
+
+  return (status);
 }
 
 #ifdef MATLAB_MEX_FILE                 /* Is this file being compiled as a MEX-file? */

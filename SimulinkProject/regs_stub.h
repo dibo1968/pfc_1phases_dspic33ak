@@ -13,6 +13,7 @@ volatile uint16_t ADCBUF_VDC     = 0;   /* DC link ADC, unsigned */
 volatile int16_t ADCBUF_PFC_VAC = 0;   /* AC line ADC, bipolar */
 volatile int16_t ADCBUF_PFC_IL  = 0;   /* Inductor current, bipolar */
 volatile int16_t ADCBUF_PFC_IL2  = 0;   /* Inductor current, bipolar */
+volatile unsigned char PFC_INRUSH_RELAY = 0;   /* Inductor current, bipolar */
 volatile unsigned long  PG4DC          = 0;   /* PWM duty register (32-bit on AK) */
 
 uint16_t Get_ADCBUF_VDC(float Vdc) {
