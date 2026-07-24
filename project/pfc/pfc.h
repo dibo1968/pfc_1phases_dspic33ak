@@ -56,7 +56,6 @@
 #include "pfc_general.h"
 #include "pfc_pi.h"
 
-#include "pfc_calc_params.h"
 #include "pfc_measure.h"
 
 // </editor-fold> 
@@ -70,6 +69,8 @@ typedef struct
 {
     float sum;
     float output;
+    /* Retained for the SiL/X2C bus mirror only. The Vdc window is now set
+       directly from PFC_VDC_AVG_SAMPLES (no longer a power-of-two shift). */
     uint16_t scaler;
     uint16_t samples;
     uint16_t sampleLimit;
@@ -87,6 +88,18 @@ typedef struct
     uint16_t status;
 }PFC_RMS_SQUARE_T;
 
+typedef struct
+{
+    int16_t  rawADC;       /* Raw load-current ADC reading (IL2). */
+    float    current;      /* Scaled load current [A]. VERIFY scale/sign vs HW. */
+    float    currentFilt;  /* IIR-filtered load current [A]. */
+    float    powerFF;      /* Feed-forward power = gain * Vdc * currentFilt [W]. */
+    float    scale;        /* Load-sensor ADC->A scale. */
+    float    filtCoeff;    /* IIR coefficient (0..1). */
+    float    gain;         /* Feed-forward gain (0..~1), bench-tuned. */
+    uint16_t enable;       /* 0 = FF off (default), 1 = on. */
+}PFC_LOAD_FF_T;
+
 typedef enum
 {
     PFC_INIT = 0,
@@ -100,9 +113,11 @@ typedef enum
 typedef enum
 {
     PFC_FAULT_NONE = 0,
-    PFC_FAULT_IP_UV = 1,
-    PFC_FAULT_IP_OV = 2,
-    PFC_FAULT_OP_OV = 3,
+    PFC_FAULT_IP_UV = (1u << 0),    /* Input under-voltage  */
+    PFC_FAULT_IP_OV = (1u << 1),    /* Input over-voltage   */
+    PFC_FAULT_OP_OV = (1u << 2),    /* Output over-voltage  */
+    PFC_FAULT_OP_UV = (1u << 3),    /* Output under-voltage (auto-recover) */
+    PFC_FAULT_IP_OC = (1u << 4),    /* Input over-current   (latched) */
 }PFC_FAULT_TYPE_T;
 
 /** Selects how the mid-ON inductor current sample is turned into a cycle
@@ -159,7 +174,10 @@ typedef struct
     PFC_PI_T piCurrent;
     PFC_CTRL_STATE_T state;
     PFC_MEASURE_CURRENT_T pfcCurrent;
+    /* Raw IL2 measurement, retained so the existing SiL/X2C bus mirror keeps
+       compiling. The control path uses loadFF below. */
     PFC_MEASURE_CURRENT_T pfcCurrent2;
+    PFC_LOAD_FF_T loadFF;
     PFC_MEASURE_VOLTAGE_T pfcVoltage;
     float iL;
     float rectifiedVac;

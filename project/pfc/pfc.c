@@ -51,6 +51,7 @@
 #include <stdbool.h>
 #include "libq.h"
 #include "pfc.h"
+#include "pfc_calc_params.h"
 #include "board_service.h"
 #include "diagnostics.h"
 
@@ -72,6 +73,19 @@ static void PFC_ParamsInit(PFC_T *);
 static void PFC_ResetParams(PFC_T *);
 static void PFC_FaultCheck(PFC_T *);
 void PFC_StateMachine(PFC_T *);
+
+inline static void PFC_UpdateMeasurements(PFC_T *);
+inline static void PFC_UpdateCurrentFeedback(PFC_T *);
+inline static void PFC_SoftStartUpdate(PFC_T *);
+inline static void PFC_UpdateBoostDutyRatio(PFC_T *);
+inline static void PFC_BurstModeUpdate(PFC_T *);
+
+static PFC_CTRL_STATE_T PFC_StateInit(PFC_T *);
+static PFC_CTRL_STATE_T PFC_StatePrecharge(PFC_T *);
+static PFC_CTRL_STATE_T PFC_StateOffsetMeas(PFC_T *);
+static PFC_CTRL_STATE_T PFC_StateWait1Cycle(PFC_T *);
+static PFC_CTRL_STATE_T PFC_StateCtrlRun(PFC_T *);
+static PFC_CTRL_STATE_T PFC_StateFault(PFC_T *);
 
 // </editor-fold> 
 
@@ -101,12 +115,16 @@ void __attribute__((__interrupt__,no_auto_psv)) PFC_ADCInterrupt()
     pfcParam.pfcVoltage.outputVoltage       = ADCBUF_VDC>>1;
     pfcParam.pfcVoltage.acVoltage           = ADCBUF_PFC_VAC;
     pfcParam.pfcCurrent.inductorCurrent     = ADCBUF_PFC_IL;
-    pfcParam.pfcCurrent2.inductorCurrent     = ADCBUF_PFC_IL2;
+    pfcParam.pfcCurrent2.inductorCurrent    = ADCBUF_PFC_IL2;
     
     pfcParam.pfcVoltage.vdc  = (float)(pfcParam.pfcVoltage.outputVoltage*ADC_VOLTAGE_SCALE);
     pfcParam.pfcVoltage.vac  = (float)(pfcParam.pfcVoltage.acVoltage*ADC_VOLTAGE_SCALE);
     pfcParam.pfcCurrent.iL   = (float)(pfcParam.pfcCurrent.inductorCurrent*ADC_CURRENT_SCALE);
-    pfcParam.pfcCurrent2.iL   = (float)(pfcParam.pfcCurrent2.inductorCurrent*ADC_CURRENT_SCALE);
+    pfcParam.pfcCurrent2.iL  = (float)(pfcParam.pfcCurrent2.inductorCurrent*ADC_CURRENT_SCALE);
+
+    /** Load-current feed-forward input: same IL2 sample, load-sensor scale. */
+    pfcParam.loadFF.rawADC   = pfcParam.pfcCurrent2.inductorCurrent;
+    pfcParam.loadFF.current  = (float)(pfcParam.loadFF.rawADC * pfcParam.loadFF.scale);
     
     
     PFC_StateMachine(&pfcParam);
@@ -118,7 +136,7 @@ void __attribute__((__interrupt__,no_auto_psv)) PFC_ADCInterrupt()
     
     PFC_PWM_PDC = pfcParam.duty;  
     #ifdef ENABLE_DIAGNOSTICS
-    if (counter < 3)
+    if (counter < (PFC_DIAGNOSTICS_DECIMATION - 1))
     {
         counter++;
     }
@@ -144,153 +162,264 @@ void __attribute__((__interrupt__,no_auto_psv)) PFC_ADCInterrupt()
  * </code>
  */
 void PFC_StateMachine(PFC_T *pfcData)
-{    
-    uint16_t pfcState = pfcData->state;
-    PFC_MEASURE_CURRENT_T *pCurrent = &pfcData->pfcCurrent;
-    PFC_MEASURE_CURRENT_T *pCurrent2 = &pfcData->pfcCurrent2;
-    PFC_MEASURE_VOLTAGE_T *pVoltage = &pfcData->pfcVoltage;
-    
-    /** Calculate average of PFC output voltage (DC voltage) feedback 
-    to remove line frequency ripple */
-    PFC_Average(&pfcData->vdcAVG,pVoltage->vdc);
-    pfcData->outputVdc = pfcData->vdcAVG.output;
-    /** Calculate average of input AC voltage feedback for offset correction */
-    PFC_Average(&pfcData->vacAVG,pVoltage->vac);
-    pVoltage->offsetVac = pfcData->vacAVG.output;
+{
+    PFC_CTRL_STATE_T pfcState = pfcData->state;
 
-    /** Function to rectify the input AC voltage */
-    pfcData->rectifiedVac = PFC_SignalRectification(pVoltage);
-    
-    /** Calculate RMS Square of rectified input voltage  */
-    PFC_SquaredRMSCalculate(&pfcData->vacRMS,pfcData->rectifiedVac);
-    
+    /** Per-ISR signal conditioning, run in every state. */
+    PFC_UpdateMeasurements(pfcData);
+
     switch(pfcState)
     {
-        case PFC_INIT:
-
-            PFC_ResetParams(pfcData);
-            HAL_PFCPWMDisableOutputs();
-            PFC_INRUSH_RELAY = 0;
-            PFC_MeasureCurrentInit(pCurrent);
-
-            pfcState = PFC_PRECHARGE;
-
-        break;
-        case PFC_PRECHARGE:
-            /** Wait for the DC bulk capacitor to charge passively through the
-                diode bridge and the inrush resistor. vdcAVG.output is the
-                moving-average of the measured bus voltage in volts. */
-            if(pfcData->vdcAVG.output >= PFC_PRECHARGE_THRESHOLD)
-            {
-                PFC_INRUSH_RELAY = 1;
-                pfcState = PFC_OFFSET_MEAS;
-            }
-        break;
-        case PFC_OFFSET_MEAS:
-            PFC_MeasureCurrentOffset(pCurrent);
-            
-            if(pCurrent->status == 1)
-            {
-                if(pfcData->vacAVG.status == 1)
-                {
-                    /** Upon first entry into this loop, set PFC output voltage 
-                        reference as measures DC voltage and enable  soft start */
-                    pfcData->piVoltage.reference = pfcData->vdcAVG.output;
-                    pVoltage->offsetVac = pfcData->vacAVG.output;
-                    pfcState = PFC_WAIT_1CYCLE;
-                }
-            }
-        break;
-        case PFC_WAIT_1CYCLE:
-
-            if(pfcData->vacRMS.status == 1)
-            {  
-                HAL_PFCPWMEnableOutputs();
-                pfcState = PFC_CTRL_RUN;
-            }
-            
-        break;
-        case PFC_CTRL_RUN:
-            
-            /* Always connect the current feedback to the control loop. */
-            pfcData->iL = pCurrent->iL;
-#ifdef ENABLE_PFC_CURRENT_OFFSET_CORRECTION
-            /* Offset correction is an optional adjustment on top of it. */
-            pfcData->iL -= pCurrent->offset;
-#endif
-            
-            PFC_FaultCheck(pfcData);
-
-            if(pfcData->faultStatus == PFC_FAULT_NONE)
-            {
-                /** Perform soft start when enabled */
-                if (pfcData->piVoltage.reference < PFC_OUPUT_VOLTAGE_REFERENCE)
-                {
-                    if(pfcData->rampRate == 0)
-                    {
-                        pfcData->piVoltage.reference = pfcData->piVoltage.reference + RAMP_COUNT;
-                        pfcData->rampRate = RAMP_RATE;
-                    }
-                    else
-                    {
-                        pfcData->rampRate--;
-                    }
-                }
-                else
-                {
-                    pfcData->piVoltage.reference = PFC_OUPUT_VOLTAGE_REFERENCE; 
-                }
-
-                PFC_CurrentRefGenerate(pfcData);                
-
-                if(pVoltage->vdc > 0)
-                {
-                    /** Calculate the ideal value of boost converter duty ratio 
-                        based on current value of Vdc and Vac. 
-                        Boost Duty Ratio = (1 - (Vac/Vdc))
-                                         = ((Vdc-Vac)/Vdc) */
-                    pfcData->boostDutyRatio = ((pVoltage->vdc - 
-                                pfcData->rectifiedVac)/pVoltage->vdc) ;
-                }
-
-                PFC_CurrentControlLoop(pfcData);
-                
-                if(pfcData->piVoltage.output < PFC_MIN_POWER)
-                {
-                    pfcData->duty = 0;
-                    pfcData->piCurrent.integralOut = 0;
-                }
-            }
-            else
-            {
-                pfcState = PFC_FAULT; 
-            }
-            break;
-        case PFC_FAULT:
-            pfcData->duty = 0;
-            HAL_PFCPWMDisableOutputs();
-            
-            if(pfcData->vacRMS.sqrOutput >= PFC_INPUT_UNDER_VOLTAGE_LIMIT_HI)
-            {
-                pfcData->faultStatus &= (~PFC_FAULT_IP_UV);    
-            }
-            if(pfcData->vacRMS.sqrOutput < PFC_INPUT_OVER_VOLTAGE_LIMIT_LO )
-            {
-                pfcData->faultStatus &= (~PFC_FAULT_IP_OV);
-            }
-            if(pfcData->faultStatus == PFC_FAULT_NONE)
-            {
-                pfcData->piVoltage.integralOut = 0;
-                pfcData->piCurrent.integralOut = 0;
-                pfcData->piVoltage.reference = pfcData->vdcAVG.output;
-                pfcState = PFC_CTRL_RUN;
-                HAL_PFCPWMEnableOutputs();
-            }
-        break;
-        default:
-        break;   
+        case PFC_INIT:        pfcState = PFC_StateInit(pfcData);       break;
+        case PFC_PRECHARGE:   pfcState = PFC_StatePrecharge(pfcData);  break;
+        case PFC_OFFSET_MEAS: pfcState = PFC_StateOffsetMeas(pfcData); break;
+        case PFC_WAIT_1CYCLE: pfcState = PFC_StateWait1Cycle(pfcData); break;
+        case PFC_CTRL_RUN:    pfcState = PFC_StateCtrlRun(pfcData);    break;
+        case PFC_FAULT:       pfcState = PFC_StateFault(pfcData);      break;
+        default:                                                       break;
     }
+
     pfcData->state = pfcState;
+}
+/**
+ * <B> Function: PFC_UpdateMeasurements(PFC_T *pfcData) </B>
+ * @brief Per-ISR signal conditioning that runs in every state: moving averages
+ *        of Vdc and Vac, the AC offset, rectification, the RMS-square of Vac,
+ *        and the load-current feed-forward term.
+ */
+inline static void PFC_UpdateMeasurements(PFC_T *pfcData)
+{
+    PFC_MEASURE_VOLTAGE_T *pVoltage = &pfcData->pfcVoltage;
+
+    /** Average of PFC output (DC) voltage over one 100 Hz ripple period
+        (nulls the double-line ripple - see PFC_VDC_AVG_SAMPLES). */
+    PFC_Average(&pfcData->vdcAVG, pVoltage->vdc);
+    pfcData->outputVdc = pfcData->vdcAVG.output;
+
+    /** Load-current feed-forward: low-pass the measured load current and form
+        the feed-forward power (gain * Vdc * I_load). Injected into the voltage-
+        loop power command in PFC_CurrentRefGenerate only when loadFF.enable is
+        set, but computed every ISR and always (so it can be observed in X2C
+        before enabling). Averaged Vdc avoids injecting bus ripple. */
+    pfcData->loadFF.currentFilt += (pfcData->loadFF.current - pfcData->loadFF.currentFilt) * pfcData->loadFF.filtCoeff;
+    pfcData->loadFF.powerFF = pfcData->loadFF.gain * pfcData->outputVdc * pfcData->loadFF.currentFilt;
+
+    /** Average of input AC voltage feedback (used as the AC offset). */
+    PFC_Average(&pfcData->vacAVG, pVoltage->vac);
+    pVoltage->offsetVac = pfcData->vacAVG.output;
+
+    /** Rectify the input AC voltage. */
+    pfcData->rectifiedVac = PFC_SignalRectification(pVoltage);
+
+    /** RMS-square of the rectified input voltage. */
+    PFC_SquaredRMSCalculate(&pfcData->vacRMS, pfcData->rectifiedVac);
+}
+/**
+ * <B> Function: PFC_UpdateCurrentFeedback(PFC_T *pfcData) </B>
+ * @brief Connect the inductor-current feedback to the control loop, with the
+ *        measured offset removed when offset correction is enabled.
+ */
+inline static void PFC_UpdateCurrentFeedback(PFC_T *pfcData)
+{
+    /* Always connect the current feedback to the control loop. */
+    pfcData->iL = pfcData->pfcCurrent.iL;
+#ifdef ENABLE_PFC_CURRENT_OFFSET_CORRECTION
+    /* Offset correction is an optional adjustment on top of it. */
+    pfcData->iL -= pfcData->pfcCurrent.offset;
+#endif
+}
+/**
+ * <B> Function: PFC_SoftStartUpdate(PFC_T *pfcData) </B>
+ * @brief Ramp the voltage-loop reference up to nominal at the soft-start rate.
+ */
+inline static void PFC_SoftStartUpdate(PFC_T *pfcData)
+{
+    if (pfcData->piVoltage.reference < PFC_OUPUT_VOLTAGE_REFERENCE)
+    {
+        if(pfcData->rampRate == 0)
+        {
+            pfcData->piVoltage.reference += RAMP_COUNT;
+            pfcData->rampRate = RAMP_RATE;
+        }
+        else
+        {
+            pfcData->rampRate--;
+        }
+    }
+    else
+    {
+        pfcData->piVoltage.reference = PFC_OUPUT_VOLTAGE_REFERENCE;
+    }
+}
+/**
+ * <B> Function: PFC_UpdateBoostDutyRatio(PFC_T *pfcData) </B>
+ * @brief Compute the ideal boost duty ratio ((Vdc-Vac)/Vdc) from present Vdc,Vac.
+ */
+inline static void PFC_UpdateBoostDutyRatio(PFC_T *pfcData)
+{
+    PFC_MEASURE_VOLTAGE_T *pVoltage = &pfcData->pfcVoltage;
+
+    if(pVoltage->vdc > 0)
+    {
+        /** Boost Duty Ratio = (1 - (Vac/Vdc)) = ((Vdc-Vac)/Vdc) */
+        pfcData->boostDutyRatio =
+                ((pVoltage->vdc - pfcData->rectifiedVac) / pVoltage->vdc);
+    }
+}
+/**
+ * <B> Function: PFC_BurstModeUpdate(PFC_T *pfcData) </B>
+ * @brief Burst control at very low load: hold the switch off and freeze the
+ *        current integrator below the minimum-power threshold.
+ */
+inline static void PFC_BurstModeUpdate(PFC_T *pfcData)
+{
+    if(pfcData->piVoltage.output < PFC_MIN_POWER)
+    {
+        pfcData->duty = 0;
+        pfcData->piCurrent.integralOut = 0;
+    }
+}
+/**
+ * <B> Function: PFC_StateInit(PFC_T *pfcData) </B>
+ * @brief PFC_INIT: reset control state, disable PWM, open the inrush relay and
+ *        start current-offset measurement. Returns the next state.
+ */
+static PFC_CTRL_STATE_T PFC_StateInit(PFC_T *pfcData)
+{
+    PFC_ResetParams(pfcData);
+    HAL_PFCPWMDisableOutputs();
+    PFC_INRUSH_RELAY = 0;
+    PFC_MeasureCurrentInit(&pfcData->pfcCurrent);
+
+    return PFC_PRECHARGE;
+}
+/**
+ * <B> Function: PFC_StatePrecharge(PFC_T *pfcData) </B>
+ * @brief PFC_PRECHARGE: wait for the DC bulk capacitor to charge passively
+ *        through the diode bridge and the inrush resistor, then bypass the
+ *        inrush resistor with the relay. Returns the next state.
+ */
+static PFC_CTRL_STATE_T PFC_StatePrecharge(PFC_T *pfcData)
+{
+    /** vdcAVG.output is the moving average of the measured bus voltage in V. */
+    if(pfcData->vdcAVG.output >= PFC_PRECHARGE_THRESHOLD)
+    {
+        PFC_INRUSH_RELAY = 1;
+        return PFC_OFFSET_MEAS;
+    }
+    return PFC_PRECHARGE;
+}
+/**
+ * <B> Function: PFC_StateOffsetMeas(PFC_T *pfcData) </B>
+ * @brief PFC_OFFSET_MEAS: accumulate the current-offset average; once the
+ *        offset and the AC average are ready, seed the voltage reference and
+ *        advance. Returns the next state.
+ */
+static PFC_CTRL_STATE_T PFC_StateOffsetMeas(PFC_T *pfcData)
+{
+    PFC_MEASURE_CURRENT_T *pCurrent = &pfcData->pfcCurrent;
+
+    PFC_MeasureCurrentOffset(pCurrent);
+
+    if((pCurrent->status == 1) && (pfcData->vacAVG.status == 1))
+    {
+        /** On first completion, set the output-voltage reference to the
+            measured DC voltage and enable soft start. */
+        pfcData->piVoltage.reference = pfcData->vdcAVG.output;
+        pfcData->pfcVoltage.offsetVac = pfcData->vacAVG.output;
+        return PFC_WAIT_1CYCLE;
+    }
+    return PFC_OFFSET_MEAS;
+}
+/**
+ * <B> Function: PFC_StateWait1Cycle(PFC_T *pfcData) </B>
+ * @brief PFC_WAIT_1CYCLE: wait for the first RMS window to complete, then
+ *        enable PWM and start closed-loop control. Returns the next state.
+ */
+static PFC_CTRL_STATE_T PFC_StateWait1Cycle(PFC_T *pfcData)
+{
+    if(pfcData->vacRMS.status == 1)
+    {
+        HAL_PFCPWMEnableOutputs();
+        return PFC_CTRL_RUN;
+    }
+    return PFC_WAIT_1CYCLE;
+}
+/**
+ * <B> Function: PFC_StateCtrlRun(PFC_T *pfcData) </B>
+ * @brief PFC_CTRL_RUN: the closed-loop control sequence - current feedback,
+ *        fault check, soft-start, current-reference generation, boost-duty
+ *        estimate, current loop and burst control. Returns the next state.
+ */
+static PFC_CTRL_STATE_T PFC_StateCtrlRun(PFC_T *pfcData)
+{
+    PFC_UpdateCurrentFeedback(pfcData);
+
+    PFC_FaultCheck(pfcData);
+    if(pfcData->faultStatus != PFC_FAULT_NONE)
+    {
+        return PFC_FAULT;
+    }
+
+    PFC_SoftStartUpdate(pfcData);
+    PFC_CurrentRefGenerate(pfcData);
+    PFC_UpdateBoostDutyRatio(pfcData);
+    PFC_CurrentControlLoop(pfcData);
+    PFC_BurstModeUpdate(pfcData);
+
+    return PFC_CTRL_RUN;
+}
+/**
+ * <B> Function: PFC_StateFault(PFC_T *pfcData) </B>
+ * @brief PFC_FAULT: hold PWM off and duty at zero; clear each auto-recovering
+ *        fault against its hysteresis limit (IP_OC stays latched). When all
+ *        faults clear, re-engage and return to PFC_CTRL_RUN. Returns the next
+ *        state.
+ */
+static PFC_CTRL_STATE_T PFC_StateFault(PFC_T *pfcData)
+{
+    pfcData->duty = 0;
+    HAL_PFCPWMDisableOutputs();
+
+    /** Clear input under-voltage once the input recovers above the UV upper
+        (recovery) limit - hysteresis vs the UV trip limit. */
+    if(pfcData->vacRMS.sqrOutput >= PFC_INPUT_UNDER_VOLTAGE_LIMIT_HI)
+    {
+        pfcData->faultStatus &= (~PFC_FAULT_IP_UV);
+    }
+    /** Clear input over-voltage once the input falls below the OV lower
+        (recovery) limit - hysteresis vs the OV trip limit. */
+    if(pfcData->vacRMS.sqrOutput < PFC_INPUT_OVER_VOLTAGE_LIMIT_LO)
+    {
+        pfcData->faultStatus &= (~PFC_FAULT_IP_OV);
+    }
+    /** Clear output over-voltage only once the bus has bled down below the OV
+        recovery limit (hysteresis vs the trip limit). */
+    if(pfcData->vdcAVG.output < PFC_OUTPUT_OVER_VOLTAGE_RECOVERY_LIMIT)
+    {
+        pfcData->faultStatus &= (~PFC_FAULT_OP_OV);
+    }
+    /** Clear output under-voltage once the bus has climbed back above the UV
+        recovery limit. With PWM disabled the bus is passively capped at the
+        rectified input peak, so this auto-recovers at nominal/high line; at low
+        line it holds off until the bus rises - a slow hiccup, since OP_UV
+        re-arms only after soft-start reaches nominal again. */
+    if(pfcData->vdcAVG.output >= PFC_OUTPUT_UNDER_VOLTAGE_RECOVERY_LIMIT)
+    {
+        pfcData->faultStatus &= (~PFC_FAULT_OP_UV);
+    }
+    /** PFC_FAULT_IP_OC is latching: deliberately never cleared here, so an
+        over-current event holds the converter off until a reset
+        (PFC_ServiceInit). */
+    if(pfcData->faultStatus == PFC_FAULT_NONE)
+    {
+        pfcData->piVoltage.integralOut = 0;
+        pfcData->piCurrent.integralOut = 0;
+        pfcData->piVoltage.reference = pfcData->vdcAVG.output;
+        HAL_PFCPWMEnableOutputs();
+        return PFC_CTRL_RUN;
+    }
+    return PFC_FAULT;
 }
 /**
 * <B> Function: PFC_ServiceInit()     </B>
@@ -333,8 +462,7 @@ void PFC_ParamsInit(PFC_T *pfcData)
     /** Initialize variables related to RMS calculation - VAC */      
     pfcData->vacRMS.sampleLimit = PFC_RMS_SQUARE_COUNTMAX;
     /** Initialize variables related to Average calculation - VDC */ 
-    pfcData->vdcAVG.scaler = PFC_AVG_SCALER;
-    pfcData->vdcAVG.sampleLimit = 1<<pfcData->vdcAVG.scaler;
+    pfcData->vdcAVG.sampleLimit = PFC_VDC_AVG_SAMPLES;
     
     pfcData->vacAVG.sampleLimit = PFC_INPUT_FREQUENCY_COUNTER;
 
@@ -360,6 +488,13 @@ void PFC_ParamsInit(PFC_T *pfcData)
     pfcData->dcmDetected = 0;
     pfcData->iValleyEst = 0.0f;
     pfcData->sampleCorrFactor = 1.0f;
+
+/** Initialize load-current feed-forward (disabled by default). */
+    pfcData->loadFF.scale       = PFC_LOAD_CURRENT_SCALE;
+    pfcData->loadFF.filtCoeff   = PFC_LOAD_FF_FILT_COEFF;
+    pfcData->loadFF.gain        = PFC_LOAD_FF_GAIN;
+    pfcData->loadFF.enable      = PFC_LOAD_FF_ENABLE_DEFAULT;
+    pfcData->loadFF.currentFilt = 0;
 }
 /**
  * <B> Function: PFC_ResetParams(PFC_T *pData)  </B>
@@ -548,7 +683,7 @@ inline static void PFC_CurrentControlLoop(PFC_T *pData)
     /** Ensure PFC current  is not negative.*/ 
     if (pData->iL < 0)
     {
-        pData->iL  = 0.0001;
+        pData->iL  = PFC_IL_MIN;
     }
     /** Calculate average current if converter operates in discontinuous
         conduction mode. In continuous conduction mode, measured current is
@@ -595,40 +730,51 @@ inline static void PFC_CurrentRefGenerate(PFC_T *pData)
 { 
     /** PI Execution - PFC output voltage control.
         Voltage PI is called at the rate specified by VOLTAGE_LOOP_EXE_RATE */
-    if (pData->voltLoopExeRate > VOLTAGE_LOOP_EXE_RATE)
+    if (++pData->voltLoopExeRate >= VOLTAGE_LOOP_EXE_RATE)
     {
         pData->piVoltage.error = pData->piVoltage.reference-pData->vdcAVG.output;
 
-        if((pData->piVoltage.error > 10) || (pData->piVoltage.error < -10 ))
+        /* Gain-schedule the integral term with hysteresis: halve Ki for large
+           errors, restore full Ki for small errors, and hold the current Ki
+           inside the [LO, HI] band so it cannot dither at the switch point.
+           piVoltage.ki persists across ticks, so no extra state is needed. */
+        if((pData->piVoltage.error > PFC_VOLTAGE_ERR_GAIN_HI) ||
+           (pData->piVoltage.error < -PFC_VOLTAGE_ERR_GAIN_HI))
         {
-            pData->piVoltage.ki = KI_V /2;
+            pData->piVoltage.ki = KI_V / 2;
         }
-        else
+        else if((pData->piVoltage.error < PFC_VOLTAGE_ERR_GAIN_LO) &&
+                (pData->piVoltage.error > -PFC_VOLTAGE_ERR_GAIN_LO))
         {
             pData->piVoltage.ki = KI_V;
         }
+        /* else: within the hysteresis band - hold the previous Ki. */
         /* Record the measurement for a self-describing bus; the reference is
          * already set by the soft-start ramp. */
         pData->piVoltage.input = pData->vdcAVG.output;
         PFC_ControllerPIUpdate(&pData->piVoltage);
         pData->voltLoopExeRate = 0;
     }
-    else
-    {
-       pData->voltLoopExeRate++; 
-    }
     
-#ifdef PFC_POWER_CONTROL    
-    /** Current reference calculation is shown below
-        Current reference = (Voltage PI o/p)*(Rectified Vac)*(1/VacRMS^2)*KMUL 
-     */ 
-        pData->currentReference = (float)((pData->piVoltage.output* pData->rectifiedVac*KMUL)
-                            /pData->vacRMS.sqrOutput);
-#endif        
-    /**  Perform Boundary check of generated current reference */
-    if (pData->currentReference > 14.14)
+    /** Current reference = powerCommand * rectifiedVac * KMUL / VacRMS^2.
+        powerCommand is the voltage-loop output plus, when enabled, the load-
+        power feed-forward (loadFF.powerFF). The feed-forward supplies the load
+        power directly so the slow voltage loop only trims losses/errors; this
+        cancels the load disturbance in the DC-bus power balance and sharply
+        improves the load-step response. */
     {
-        pData->currentReference = 14.14;
+        float powerCommand = pData->piVoltage.output;
+        if (pData->loadFF.enable)
+        {
+            powerCommand += pData->loadFF.powerFF;
+        }
+        pData->currentReference = (float)((powerCommand * pData->rectifiedVac * KMUL)
+                            / pData->vacRMS.sqrOutput);
+    }
+    /**  Perform Boundary check of generated current reference */
+    if (pData->currentReference > PFC_IREF_PEAK_MAX)
+    {
+        pData->currentReference = PFC_IREF_PEAK_MAX;
     }
     else if (pData->currentReference < 0)
     {
@@ -670,12 +816,14 @@ float PFC_SignalRectification(PFC_MEASURE_VOLTAGE_T *pSignal)
  */
 static void PFC_SquaredRMSCalculate(PFC_RMS_SQUARE_T *pData,float input)
 {       
-    pData->sum += (float) (input*input);
-    if(pData->samples < pData->sampleLimit)
-    {
-       pData->samples++;  
-    }
-    else
+        pData->sum += (float) (input*input);
+    pData->samples++;
+    /** Match PFC_Average's ordering: accumulate, increment, then test with >=
+        so each window integrates exactly sampleLimit terms and divides by the
+        same count. (Previously the sum held sampleLimit+1 terms but divided by
+        sampleLimit, biasing sqrOutput high by 1/sampleLimit and stretching the
+        window one sample past the half-line cycle.) */
+    if(pData->samples >= pData->sampleLimit)
     {
        pData->sqrOutput = (float)((pData->sum/pData->sampleLimit));
        pData->status    = 1;
@@ -721,21 +869,47 @@ static void PFC_Average(PFC_AVG_T *pData,float input)
  * </code>
  */
 void PFC_FaultCheck(PFC_T *pData)
-{   
+{
+    /** Recompute the fault mask from scratch each pass so faults never
+        accumulate or alias; each fault is an independent bit set with |=.
+        Latching / recovery is handled by the PFC_FAULT state, not here. */
+    uint16_t faults = PFC_FAULT_NONE;
+
     /*Check the condition for output over voltage*/
     if(pData->vdcAVG.output >= PFC_OUTPUT_OVER_VOLTAGE_LIMIT)
     {
-        pData->faultStatus += PFC_FAULT_OP_OV;    
+        faults |= PFC_FAULT_OP_OV;
     }
     /*Check the condition for input under voltage*/
     if(pData->vacRMS.sqrOutput < PFC_INPUT_UNDER_VOLTAGE_LIMIT_LO)
     {
-        pData->faultStatus += PFC_FAULT_IP_UV;
+        faults |= PFC_FAULT_IP_UV;
     }
     /*Check the condition for input over voltage*/
     if(pData->vacRMS.sqrOutput >= PFC_INPUT_OVER_VOLTAGE_LIMIT_HI)
     {
-        pData->faultStatus += PFC_FAULT_IP_OV;
+        faults |= PFC_FAULT_IP_OV;
     }
+    /** Instantaneous input over-current - software OCP on the offset-corrected
+        inductor current (symmetric test catches either polarity). Latching:
+        PFC_FAULT provides no auto-clear, because once PWM is disabled the
+        inductor current decays to zero in microseconds and a threshold-based
+        clear would self-clear immediately. */
+    if((pData->iL >=  PFC_INPUT_OVER_CURRENT_PEAK) ||
+       (pData->iL <= -PFC_INPUT_OVER_CURRENT_PEAK))
+    {
+        faults |= PFC_FAULT_IP_OC;
+    }
+    /** Output under-voltage (bus collapse / boost failure / overload), armed
+        only once soft-start has reached the nominal reference - during the
+        ramp the bus is legitimately below nominal. Auto-recovering with
+        hysteresis (see the UV recovery clear in PFC_FAULT). */
+    if((pData->piVoltage.reference >= PFC_OUPUT_VOLTAGE_REFERENCE) &&
+       (pData->vdcAVG.output < PFC_OUTPUT_UNDER_VOLTAGE_LIMIT))
+    {
+        faults |= PFC_FAULT_OP_UV;
+    }
+
+    pData->faultStatus = faults;
 }
 // </editor-fold>

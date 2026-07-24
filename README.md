@@ -128,11 +128,6 @@ Follow the below instructions, step by step, to set up and run the PFC demo appl
           <p align="left" >
           <img  src="images/undef_debug_boost.png" width="200"></p>
           
-     - Ensure that the macro <code><b>PFC_POWER_CONTROL</b></code> is defined.
-
-          <p align="left" >
-          <img  src="images/pfc_power_control.png" width="200"></p>
-     
      - Update the input supply frequency by setting the macro <code>**PFC_INPUT_FREQUENCY**</code>.
 
           <p align="left" >

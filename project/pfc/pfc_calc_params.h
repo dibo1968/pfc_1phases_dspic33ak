@@ -16,7 +16,7 @@
 /*******************************************************************************
 * SOFTWARE LICENSE AGREEMENT
 * 
-* © [2024] Microchip Technology Inc. and its subsidiaries
+* ï¿½ [2024] Microchip Technology Inc. and its subsidiaries
 * 
 * Subject to your compliance with these terms, you may use this Microchip 
 * software and any derivatives exclusively with Microchip products. 
@@ -77,11 +77,22 @@ extern "C" {
 #define PFC_INPUT_OVER_VOLTAGE_RMS_SQUARE_HI    PFC_INPUT_OVER_VOLTAGE_HI*PFC_INPUT_OVER_VOLTAGE_HI           
 /** Normalize PFC output over voltage with PFC full scale DC output voltage */
 #define PFC_OUTPUT_OVER_VOLTAGE_NORMALIZED      PFC_OUTPUT_OVER_VOLTAGE
+/** Normalize PFC output over-voltage recovery limit */
+#define PFC_OUTPUT_OVER_VOLTAGE_RECOVERY_NORMALIZED  PFC_OUTPUT_OVER_VOLTAGE_RECOVERY
 /**  Normalize PFC output under voltage with PFC full scale DC output voltage */
 #define PFC_OUTPUT_UNDER_VOLTAGE_NORMALIZED     PFC_OUTPUT_UNDER_VOLTAGE
+/** Normalize PFC output under-voltage recovery limit */
+#define PFC_OUTPUT_UNDER_VOLTAGE_RECOVERY_NORMALIZED  PFC_OUTPUT_UNDER_VOLTAGE_RECOVERY
     
 /** Fault limits are converted to Q15 Representation and used by the firmware */
 #define PFC_OUTPUT_OVER_VOLTAGE_LIMIT           PFC_OUTPUT_OVER_VOLTAGE_NORMALIZED
+#define PFC_OUTPUT_OVER_VOLTAGE_RECOVERY_LIMIT  PFC_OUTPUT_OVER_VOLTAGE_RECOVERY_NORMALIZED
+#define PFC_OUTPUT_UNDER_VOLTAGE_LIMIT          PFC_OUTPUT_UNDER_VOLTAGE_NORMALIZED
+#define PFC_OUTPUT_UNDER_VOLTAGE_RECOVERY_LIMIT PFC_OUTPUT_UNDER_VOLTAGE_RECOVERY_NORMALIZED
+
+/** Peak inductor-current trip for software over-current protection, derived
+    from the user RMS limit PFC_INPUT_OVER_CURRENT (sinusoidal assumption). */
+#define PFC_INPUT_OVER_CURRENT_PEAK             (float)(PFC_INPUT_OVER_CURRENT * SQR_ROOT_OF_2)
 #define PFC_INPUT_UNDER_VOLTAGE_LIMIT_LO        PFC_INPUT_UNDER_VOLTAGE_LO_RMS_SQUARE  
 #define PFC_INPUT_UNDER_VOLTAGE_LIMIT_HI        PFC_INPUT_UNDER_VOLTAGE_HI_RMS_SQUARE
 #define PFC_INPUT_OVER_VOLTAGE_LIMIT_LO         PFC_INPUT_OVER_VOLTAGE_RMS_SQUARE_LO

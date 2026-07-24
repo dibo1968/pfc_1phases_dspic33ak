@@ -80,21 +80,22 @@
 /*PFC inductor current offset measurement*/
 //#define ENABLE_PFC_CURRENT_OFFSET_CORRECTION
 
-/** When defined, operates in power reference control. 
-   That is the voltage PI output correspond to the input power. */
-#define PFC_POWER_CONTROL   
-        
 /* Define PFC input AC voltage frequency in Hz */
 #define PFC_INPUT_FREQUENCY             50.0f 
         
 /* Define the input AC voltage frequency in terms of PWM clock period */       
 #define PFC_INPUT_FREQUENCY_COUNTER     (PFC_PWMFREQUENCY_HZ/PFC_INPUT_FREQUENCY )
          
-/* Define sample numbers for DC bus voltage average   
-    * In this case, 128 samples or 2^7 samples are taken and averaged.
-      The scaler is chosen as power of 2 ,such that shifting is done 
-      to calculate average from the sum of samples.  */        
-#define PFC_AVG_SCALER                  7   //2^7 = 128 samples average 
+/* Number of samples to average the DC bus voltage over.
+ * Set to one 100 Hz double-line-frequency ripple period (= half the line
+ * period, since the bus ripple is at twice the line frequency). Averaging
+ * over an integer number of ripple periods structurally nulls the ripple and
+ * its harmonics, keeping them out of the voltage-loop error and hence out of
+ * the current reference - this is what limits input-current (3rd-harmonic) THD.
+ * 64 kHz / (2 x 50 Hz) = 640 samples = 10 ms.
+ * NOTE: 5x the old 128-sample (2 ms) window - the voltage-loop feedback is now
+ * slower and cleaner, so KP_V / KI_V may need bench re-verification. */
+#define PFC_VDC_AVG_SAMPLES             (PFC_PWMFREQUENCY_HZ/(2*PFC_INPUT_FREQUENCY))
         
 /* Counter for RMS calculation of rectified input AC voltage in terms of 
  * PWM clock period*/       
@@ -127,6 +128,31 @@
         
 #define ADC_CURRENT_SCALE               (float)(PFC_INPUT_MAX_CURRENT/32768.0f)
 
+/* ===== Load-current feed-forward ==================================
+ * IL2 = load (output) current, measured after the DC-link capacitor on the
+ * load path. Adding the measured load power (Vdc * I_load) to the voltage-loop
+ * power command lets the converter answer load steps immediately instead of
+ * waiting for the slow voltage loop, and cancels the load disturbance in the
+ * DC-bus power balance. DISABLED by default - verify the measurement and tune
+ * the gain on the bench / SiL before enabling. */
+
+/* Load-sensor ADC->Amp scale. VERIFY against the actual load-current front-end
+ * (shunt/amplifier) - it is NOT necessarily the inductor-current sensor. The
+ * placeholder equals the inductor scale, which is also what the SiL model uses
+ * to inject Iout, so this default is correct for SiL and must be checked for HW. */
+#define PFC_LOAD_CURRENT_SCALE          ADC_CURRENT_SCALE
+
+/* First-order IIR coefficient (0..1) for the load current. Higher = faster and
+ * noisier; 0.05 at the 64 kHz ISR gives a corner near ~500 Hz. */
+#define PFC_LOAD_FF_FILT_COEFF          0.05f
+
+/* Feed-forward gain. 1.0 = full measured load power. Start ~0.5-0.8 and raise
+ * while watching Vdc overshoot on a load step. */
+#define PFC_LOAD_FF_GAIN                0.8f
+
+/* Runtime enable default: 0 = off until scale/sign are verified. */
+#define PFC_LOAD_FF_ENABLE_DEFAULT      0
+
 /* Boost inductance in Henry. Must match the value used in the plant model
  * (L in mchp_pfc_foc_dsPIC33A_data.m). Used by the conduction mode detector
  * to predict the inductor current slopes.
@@ -157,6 +183,15 @@
         
 /* PFC Input over current limit in A (rms)*/
 #define PFC_INPUT_OVER_CURRENT          12.0f
+
+/* PFC maximum current-reference peak in A = sqrt(2) x ~10 Arms design input
+   current. Kept below the 12 Arms / ~16.97 Apk software OCP trip
+   (PFC_INPUT_OVER_CURRENT_PEAK) so the controller clamps before OCP fires. */
+#define PFC_IREF_PEAK_MAX               14.14f
+
+/* Small positive floor applied to the measured inductor current so it never
+   reads negative (noise/offset) ahead of the current loop. */
+#define PFC_IL_MIN                      0.0001f
         
 /* Specify PFC Input Voltage Ranges in which PFC Control will start executing */ 
         
@@ -174,9 +209,24 @@
         
 /* Specify PFC DC over voltage limit in V */
 #define PFC_OUTPUT_OVER_VOLTAGE         410.0f
+
+/* Specify PFC DC over-voltage recovery (auto-clear) limit in V.
+   Provides hysteresis below PFC_OUTPUT_OVER_VOLTAGE so an output OV fault only
+   clears once the bus has bled down, not on the input-voltage recovery tests. */
+#define PFC_OUTPUT_OVER_VOLTAGE_RECOVERY 395.0f
         
-/* Specify PFC DC over voltage limit in V */
+/* Specify PFC DC under voltage limit in V */
 #define PFC_OUTPUT_UNDER_VOLTAGE        310.0f
+
+/* Specify PFC DC under-voltage recovery (auto-clear) limit in V.
+   Hysteresis above the PFC_OUTPUT_UNDER_VOLTAGE trip so a bus-collapse fault
+   clears only once the bus has climbed back up. NOTE: with PWM disabled the bus
+   is passively capped at the rectified input peak (~325 V at 230 Vrms), so this
+   MUST stay below that peak for auto-recovery to occur - hence 320 V (a 10 V
+   band) rather than a full 15 V mirror of the OV band. At lower line the bus
+   cannot passively reach this level, so the fault holds off until the line/bus
+   recovers. Tune to your nominal input. */
+#define PFC_OUTPUT_UNDER_VOLTAGE_RECOVERY 320.0f
      
 /* Specify PFC output voltage reference in V */
 #define PFC_OUPUT_VOLTAGE_NOMINAL       380.0f
@@ -197,13 +247,17 @@ of PFC control loop execution rate  */
  * This implements burst control at very low load.*/   
         
 #define PFC_MIN_POWER                  1.0f        
-/* Define Voltage loop execution rate . 
-    * This is specified in integral number of PFC current control loop execution 
-      rate. 
-        In this case , PFC control loop frequency is 64 kHz .
-        Then voltage loop is executed at 64kHz/ VOLTAGE_LOOP_EXE_RATE = 64kHz/16 
-                                                                      = 4kHz  */   
-#define VOLTAGE_LOOP_EXE_RATE           10
+
+/* Run DiagnosticsStepIsr() (X2C scope) once every N ADC ISRs. At the 64 kHz
+   ISR this decimates the scope update to 64 kHz / 4 = 16 kHz. */
+#define PFC_DIAGNOSTICS_DECIMATION      4
+/* Voltage-loop execution rate divisor: the voltage PI runs once every
+ * VOLTAGE_LOOP_EXE_RATE current-loop (ISR) ticks. At the 64 kHz ISR:
+ *     64 kHz / 12 = 5.33 kHz  (current tuning point - KP_V/KI_V are set for it).
+ * The gate is (++counter >= VOLTAGE_LOOP_EXE_RATE), so the divisor is exactly
+ * this value. Set to 16 for the originally-documented 64 kHz / 16 = 4 kHz, but
+ * that slows the loop and invalidates the existing KP_V/KI_V - re-tune first. */
+#define VOLTAGE_LOOP_EXE_RATE           12
            
 /* KMUL is used as a scaling constant    
  */ 
@@ -220,6 +274,14 @@ of PFC control loop execution rate  */
 /** Voltage  loop Coefficients */
 #define KP_V                            20.199f
 #define KI_V                            0.0992f 
+
+/* Voltage-error hysteresis band (V) for gain-scheduling the voltage-PI integral
+   term. |error| above HI halves Ki (fast large-transient response); |error|
+   below LO restores full Ki; inside [LO, HI] the last setting is held so the
+   gain cannot dither tick-to-tick at the switch point (limit-cycle risk).
+   Centred on the original 10 V step with a +/-2 V band. */
+#define PFC_VOLTAGE_ERR_GAIN_HI         12.0f
+#define PFC_VOLTAGE_ERR_GAIN_LO         8.0f
 #define PI_V_OUT_MAX                    1500
 
 // </editor-fold>
