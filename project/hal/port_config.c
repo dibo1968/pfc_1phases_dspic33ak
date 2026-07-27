@@ -130,10 +130,11 @@ void SetupGPIOPorts(void)
 /* Push button SW1        : PIN #49: RP58/IOMF7/RD9   */
 /* SW2 : DIM:036 -        : PIN #50 : RP59/RD10  */
 
-/*dibo a adaugat in plus*/
- /*UART_RX :              : PIN #46 : RP44/IOMD8/IOMF8/RC11 (Input)
- /*UART_TX :              : PIN #45 : RP43/IOMD9/IOMF9/RC10(Output)   */
-/*Inrush relay            : PIN #36: RP40/RC7*/
+/* Digital Power PIM (EV67K87A) assignments - these supersede the DIM:0xx
+   references above, which belong to the MCHV Motor Control DIM. */
+/* UART_RX (MCP2221A)     : PIN #33 : RC6/RP39 (Input)  */
+/* UART_TX (MCP2221A)     : PIN #36 : RC7/RP40 (Output) */
+/* Inrush relay           : PIN #45 : RC10/RP43 (Output, PLACEHOLDER) */
 void MapGPIOHWFunction(void)
 {  
       /* ANALOG SIGNALS */
@@ -175,20 +176,31 @@ void MapGPIOHWFunction(void)
     TRISDbits.TRISD9 = 1;            
     /* SW2 : DIM:036 - PIN #50 : RP59/RD10  */
     TRISDbits.TRISD10 = 1;
-    /* Inrush relay : PIN #36: RP40/RC7*/
-    TRISCbits.TRISC7 = 1;
+    /* Inrush relay : PIN #45 : RC10/RP43, DP PIM edge connector pin 39.
+       PLACEHOLDER pin - see PFC_INRUSH_RELAY in port_config.h. Output, and left
+       low by the LATC = 0x0000 in SetupGPIOPorts() so the relay starts open.
+       RP43 carries no PPS output assignment now that the UART moved to RP40, so
+       the port logic owns this pin. */
+    TRISCbits.TRISC10 = 0;
 	
     /* Configuring FLTLAT_OC_OV (DIM:040) - Pin #32 : RP28/SDI2/RB11 as PCI9 */
 	_PCI9R = 28;
     
 	/** Diagnostic Interface
-        Re-map UART Channels to the device pins connected to the following 
-        pins on the Motor Control Development Board.
-        UART_RX : DIM:054 - PIN #46 : RP44/IOMD8/IOMF8/RC11 (Input)
-        UART_TX : DIM:052 - PIN #45 : RP43/IOMD9/IOMF9/RC10(Output)   */
-    
-    _U1RXR = 44;
-    _RP43R = 9;
+        Re-map UART Channels to the on-board MCP2221A USB-UART bridge of the
+        dsPIC33AK128MC106 Digital Power PIM (EV67K87A), per its schematic
+        (DS70005571, Figure 2-1):
+        UART_RX : PIN #33 : RC6/RP39 (Input)
+        UART_TX : PIN #36 : RC7/RP40 (Output)
+
+        NOTE: the previous mapping (_U1RXR = 44 / _RP43R = 9, i.e. RC11/RC10)
+        targets the MCHV-230VAC Motor Control DIM, where the bridge sits on
+        different pins. On the DP PIM those pins go to the edge connector
+        instead, so the UART transmitted into open air and X2C-Scope saw
+        nothing at all. */
+
+    _U1RXR  = 39;
+    _RP40R  = 9;
     
 }
 // </editor-fold>

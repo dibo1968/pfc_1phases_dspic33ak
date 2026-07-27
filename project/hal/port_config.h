@@ -83,8 +83,12 @@
 #define LED1                    LATDbits.LATD5
 /* PFC Enable Signal:    DIM:008 : PIN 42 :  RP38/PWM4L/RC5 */
 #define PFC_ENABLE_SIGNAL       LATCbits.LATC5
-/* Inrush relay : PIN 36: RP40/RC7*/
-#define PFC_INRUSH_RELAY       LATCbits.LATC7        
+/* Inrush relay : PIN #45 : RC10/RP43, DP PIM edge connector pin 39.
+   PLACEHOLDER - reassign once the PIM adapter board is built and the real relay
+   pin is known. RC10 was the old (MCHV Motor Control DIM) UART TX pin; it is
+   free now that the UART moved to RC6/RC7, and the DP PIM routes it to the edge
+   connector as Digital General Purpose with a 47R series resistor. */
+#define PFC_INRUSH_RELAY       LATCbits.LATC10
 // </editor-fold>
 
 // <editor-fold defaultstate="expanded" desc="INTERFACE FUNCTIONS ">
