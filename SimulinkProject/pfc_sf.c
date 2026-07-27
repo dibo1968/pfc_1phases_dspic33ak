@@ -26,7 +26,7 @@
  * | See matlabroot/simulink/src/sfuntmpl_doc.c for a more detailed template |
  *  -------------------------------------------------------------------------
  *
- * Created: Thu Jul 23 08:11:62 2026
+ * Created: Sun Jul 26 22:08:13 2026
  */
 
 #define S_FUNCTION_LEVEL               2
@@ -775,6 +775,7 @@ static void mdlStart(SimStruct *S)
   slDataTypeAccess *dta = ssGetDataTypeAccess(S);
   const char *bpath = ssGetPath(S);
   DTypeId PFC_AVG_T_BusId = ssGetDataTypeId(S,"PFC_AVG_T_Bus");
+  DTypeId PFC_LOAD_FF_T_BusId = ssGetDataTypeId(S,"PFC_LOAD_FF_T_Bus");
   DTypeId PFC_MEASURE_CURRENT_T_BusId = ssGetDataTypeId(S,
     "PFC_MEASURE_CURRENT_T_Bus");
   DTypeId PFC_MEASURE_VOLTAGE_T_BusId = ssGetDataTypeId(S,
@@ -782,7 +783,7 @@ static void mdlStart(SimStruct *S)
   DTypeId PFC_PI_T_BusId = ssGetDataTypeId(S,"PFC_PI_T_Bus");
   DTypeId PFC_RMS_SQUARE_T_BusId = ssGetDataTypeId(S,"PFC_RMS_SQUARE_T_Bus");
   DTypeId PFC_T_BusId = ssGetDataTypeId(S,"PFC_T_Bus");
-  busInfoStruct *busInfo = (busInfoStruct *)malloc(85*sizeof(busInfoStruct));
+  busInfoStruct *busInfo = (busInfoStruct *)malloc(97*sizeof(busInfoStruct));
   if (busInfo==NULL) {
     ssSetLocalErrorStatus(S, "Memory allocation failure");
     return;
@@ -998,8 +999,52 @@ static void mdlStart(SimStruct *S)
   busInfo[83].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 23);
   busInfo[83].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
   busInfo[83].numElems = 1;
-  busInfo[84].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_T_BusId);
-  busInfo[84].numElems = ssGetOutputPortWidth(S, 8);
+  busInfo[84].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 24);
+  busInfo[84].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_LOAD_FF_T_BusId);
+  busInfo[84].numElems = 1;
+  busInfo[85].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 0);
+  busInfo[85].elemSize = dtaGetDataTypeSize(dta, bpath, SS_INT16);
+  busInfo[85].numElems = 1;
+  busInfo[86].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 1);
+  busInfo[86].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[86].numElems = 1;
+  busInfo[87].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 2);
+  busInfo[87].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[87].numElems = 1;
+  busInfo[88].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 3);
+  busInfo[88].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[88].numElems = 1;
+  busInfo[89].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 4);
+  busInfo[89].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[89].numElems = 1;
+  busInfo[90].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 5);
+  busInfo[90].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[90].numElems = 1;
+  busInfo[91].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 6);
+  busInfo[91].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[91].numElems = 1;
+  busInfo[92].offset = dtaGetDataTypeElementOffset(dta, bpath,
+    PFC_LOAD_FF_T_BusId, 7);
+  busInfo[92].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[92].numElems = 1;
+  busInfo[93].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 25);
+  busInfo[93].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[93].numElems = 1;
+  busInfo[94].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 26);
+  busInfo[94].elemSize = dtaGetDataTypeSize(dta, bpath, SS_SINGLE);
+  busInfo[94].numElems = 1;
+  busInfo[95].offset = dtaGetDataTypeElementOffset(dta, bpath, PFC_T_BusId, 27);
+  busInfo[95].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
+  busInfo[95].numElems = 1;
+  busInfo[96].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_T_BusId);
+  busInfo[96].numElems = ssGetOutputPortWidth(S, 8);
   ssSetUserData(S, busInfo);
 
   /* Allocate memory for arrays or nested arrays of buses DWork pointers */
@@ -1194,6 +1239,28 @@ static void mdlOutputs(SimStruct *S, int_T tid)
     .rectifiedVac;
   *((real32_T*)((char *) pfcParam_out + busInfo[83].offset)) = (_pfcParam_outBUS)
     .outputVdc;
+  *((int16_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[85].offset))
+    = (_pfcParam_outBUS).loadFF.rawADC;
+  *((real32_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[86].offset))
+    = (_pfcParam_outBUS).loadFF.current;
+  *((real32_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[87].offset))
+    = (_pfcParam_outBUS).loadFF.currentFilt;
+  *((real32_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[88].offset))
+    = (_pfcParam_outBUS).loadFF.powerFF;
+  *((real32_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[89].offset))
+    = (_pfcParam_outBUS).loadFF.scale;
+  *((real32_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[90].offset))
+    = (_pfcParam_outBUS).loadFF.filtCoeff;
+  *((real32_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[91].offset))
+    = (_pfcParam_outBUS).loadFF.gain;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[84].offset + busInfo[92].offset))
+    = (_pfcParam_outBUS).loadFF.enable;
+  *((real32_T*)((char *) pfcParam_out + busInfo[93].offset)) = (_pfcParam_outBUS)
+    .dutyRatio;
+  *((real32_T*)((char *) pfcParam_out + busInfo[94].offset)) = (_pfcParam_outBUS)
+    .dutyFF;
+  *((uint16_T*)((char *) pfcParam_out + busInfo[95].offset)) = (_pfcParam_outBUS)
+    .dutyFFEnable;
 }
 
 /* Function: mdlTerminate =====================================================

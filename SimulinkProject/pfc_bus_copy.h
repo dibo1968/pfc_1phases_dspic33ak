@@ -72,6 +72,18 @@
         (d).vdc           = (s).vdc;                                        \
     } while (0)
 
+#define PFC_BUS_COPY_LOADFF(d, s)                                           \
+    do {                                                                    \
+        (d).rawADC      = (s).rawADC;                                       \
+        (d).current     = (s).current;                                      \
+        (d).currentFilt = (s).currentFilt;                                  \
+        (d).powerFF     = (s).powerFF;                                      \
+        (d).scale       = (s).scale;                                        \
+        (d).filtCoeff   = (s).filtCoeff;                                    \
+        (d).gain        = (s).gain;                                         \
+        (d).enable      = (s).enable;                                       \
+    } while (0)
+
 #define PFC_COPY_TO_BUS(dst, src)                                           \
     do {                                                                    \
         (dst)->duty                   = (src).duty;                         \
@@ -98,6 +110,10 @@
         (dst)->iL                     = (src).iL;                           \
         (dst)->rectifiedVac           = (src).rectifiedVac;                 \
         (dst)->outputVdc              = (src).outputVdc;                    \
+        PFC_BUS_COPY_LOADFF((dst)->loadFF,       (src).loadFF);             \
+        (dst)->dutyRatio              = (src).dutyRatio;                    \
+        (dst)->dutyFF                 = (src).dutyFF;                       \
+        (dst)->dutyFFEnable           = (src).dutyFFEnable;                 \
     } while (0)
 
 #endif /* PFC_BUS_COPY_H */

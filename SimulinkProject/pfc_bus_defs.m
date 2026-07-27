@@ -80,10 +80,27 @@ makeBus('PFC_MEASURE_VOLTAGE_T_Bus', 'Voltage feedback (PFC_MEASURE_VOLTAGE_T).'
     'vdc'                   'single'
     });
 
+makeBus('PFC_LOAD_FF_T_Bus', 'Load-current feed-forward (PFC_LOAD_FF_T).', { ...
+    'rawADC'                'int16'
+    'current'               'single'
+    'currentFilt'           'single'
+    'powerFF'               'single'
+    'scale'                 'single'
+    'filtCoeff'             'single'
+    'gain'                  'single'
+    'enable'                'uint16'
+    });
+
 % Top level. 'state' is int32 because a C enum is an int on the MEX host
 % compiler, which keeps the bus byte layout identical to PFC_T. To see the
 % state names instead of 0..5 in the Data Inspector, swap int32 for
 % 'Enum: pfc_ctrl_state' (that classdef already exists in this folder).
+%
+% Element ORDER need not match PFC_T - pfc_bus_copy.h copies field by field,
+% so the two layouts are independent. New elements are therefore APPENDED
+% (loadFF sits between pfcCurrent2 and pfcVoltage in the C struct), because
+% pfc_sf.c indexes bus elements positionally in a hand-maintained busInfo[]
+% table and appending leaves every existing index valid.
 makeBus('PFC_T_Bus', 'Complete PFC control parameter set (PFC_T).', { ...
     'duty'                  'uint32'
     'samplePoint'           'uint16'
@@ -109,6 +126,10 @@ makeBus('PFC_T_Bus', 'Complete PFC control parameter set (PFC_T).', { ...
     'iL'                    'single'
     'rectifiedVac'          'single'
     'outputVdc'             'single'
+    'loadFF'                'Bus: PFC_LOAD_FF_T_Bus'
+    'dutyRatio'             'single'
+    'dutyFF'                'single'
+    'dutyFFEnable'          'uint16'
     });
 
 end

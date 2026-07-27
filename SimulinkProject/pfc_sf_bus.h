@@ -11,6 +11,21 @@
 
 
 
+#ifndef DEFINED_TYPEDEF_FOR_PFC_LOAD_FF_T_Bus_
+#define DEFINED_TYPEDEF_FOR_PFC_LOAD_FF_T_Bus_ 
+typedef struct {
+  int16_T rawADC;
+  real32_T current;
+  real32_T currentFilt;
+  real32_T powerFF;
+  real32_T scale;
+  real32_T filtCoeff;
+  real32_T gain;
+  uint16_T enable;
+} PFC_LOAD_FF_T_Bus;
+#endif
+
+
 #ifndef DEFINED_TYPEDEF_FOR_PFC_MEASURE_VOLTAGE_T_Bus_
 #define DEFINED_TYPEDEF_FOR_PFC_MEASURE_VOLTAGE_T_Bus_ 
 typedef struct {
@@ -109,6 +124,10 @@ typedef struct {
   real32_T iL;
   real32_T rectifiedVac;
   real32_T outputVdc;
+  PFC_LOAD_FF_T_Bus loadFF;
+  real32_T dutyRatio;
+  real32_T dutyFF;
+  uint16_T dutyFFEnable;
 } PFC_T_Bus;
 #endif
 

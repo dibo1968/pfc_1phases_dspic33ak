@@ -146,12 +146,34 @@
  * noisier; 0.05 at the 64 kHz ISR gives a corner near ~500 Hz. */
 #define PFC_LOAD_FF_FILT_COEFF          0.05f
 
-/* Feed-forward gain. 1.0 = full measured load power. Start ~0.5-0.8 and raise
- * while watching Vdc overshoot on a load step. */
-#define PFC_LOAD_FF_GAIN                0.8f
+/* Feed-forward gain. Deliberately BELOW 1.0 - do not set it to 1.0.
+ *
+ * For any load whose current rises with bus voltage (a resistive load being the
+ * worst case), powerFF = gain*Vdc*Iload has the same Vdc dependence as the load
+ * itself, so
+ *      d(powerFF - Pout)/dVdc = (2*gain - 2) * Vdc / R
+ * and at gain = 1.0 that is exactly ZERO: the feed-forward cancels the load's
+ * own self-regulation and the bus loses its restoring term. At the same time
+ * the voltage PI has nothing left to do and sits against its zero clamp, so it
+ * cannot trim downwards either.
+ *
+ * SiL 2026-07-27 at gain 1.0: 11.4 Hz limit cycle, 12.5 V p-p on vdcAVG.
+ * (That run also exposed a genuine bug - burst control was testing
+ * piVoltage.output instead of the total power command - now fixed in
+ * PFC_BurstModeUpdate. Both were needed.)
+ *
+ * 0.9 leaves -0.197 W/V of damping and parks the voltage PI around 40 W,
+ * clear of the PFC_MIN_POWER burst threshold, while still removing 90% of the
+ * load step from the slow voltage loop. 0.8 (dip 4.81 V) is the proven-safe
+ * value if margin matters more than the last volt. */
+#define PFC_LOAD_FF_GAIN                0.9f
 
-/* Runtime enable default: 0 = off until scale/sign are verified. */
-#define PFC_LOAD_FF_ENABLE_DEFAULT      0
+/* Runtime enable default: 1 = on. Verified in SiL 2026-07-26 - the injected
+ * IL2 reads back as pfcCurrent2.iL to within 0.1% of the plant's Iout and
+ * PFC_LOAD_CURRENT_SCALE matches Get_ADCBUF_PFC_IL2 in regs_stub.h. Set back
+ * to 0 on hardware until the load-current front-end scale and sign are
+ * measured on the bench. */
+#define PFC_LOAD_FF_ENABLE_DEFAULT      1
 
 /* Boost inductance in Henry. Must match the value used in the plant model
  * (L in mchp_pfc_foc_dsPIC33A_data.m). Used by the conduction mode detector
@@ -165,6 +187,43 @@
 
 /* Ts/L, in A per Volt. Folded at compile time. */
 #define PFC_TS_OVER_L                   (float)(PFC_LOOPTIME_SEC/PFC_INDUCTANCE)
+
+/* 2L/Ts, in Volt per Amp. Used by the DCM branch of the duty feed-forward. */
+#define PFC_TWO_L_OVER_TS               (float)(2.0f*PFC_INDUCTANCE/PFC_LOOPTIME_SEC)
+
+/* ===== Duty feed-forward =========================================
+ * Without it, the current PI's integrator has to synthesise the whole
+ * (Vo-Vg)/Vo duty profile, which swings ~0.15..1.0 every half line cycle. An
+ * integrator only moves at Ki*error, so tracking that ramp costs a SUSTAINED
+ * current error of (dD/dt)/(KI_I/Ts) - measured at 0.8..1.3 A on a 2.2 A peak
+ * reference in SiL at 375 W (31% THD, PF 0.933). Feeding the duty forward
+ * leaves the PI to trim losses only.
+ *
+ * The feed-forward is conduction-mode dependent because the two plants differ:
+ *   CCM  d = (Vo-Vg)/Vo                      (boostDutyRatio)
+ *   DCM  d = sqrt(2L/Ts * Iref * D_ideal/Vg)
+ * The two expressions are equal at the CCM/DCM boundary, so the composite is
+ * continuous - which also removes the ~1 A current step seen at the boundary
+ * crossing when the carried-over duty sat above D_ideal.
+ */
+
+/* Runtime enable default: 1 = feed-forward on. Held in PFC_T.dutyFFEnable so
+ * it can be toggled from the debugger / X2C Scope without a rebuild. */
+#define PFC_DUTY_FF_ENABLE_DEFAULT      1
+
+/* Symmetric limit on the PI trim (piCurrent min/max output) once the
+ * feed-forward carries the operating point. It only has to cover losses
+ * (measured 0.003..0.013 in CCM) plus inductance/model error, so keep it tight
+ * - this is now the current loop's anti-windup bound. Ignored when
+ * dutyFFEnable is 0, where the PI reverts to a 0..PFC_MAX_DUTY output. */
+#define PFC_DUTY_TRIM_MAX               0.25f
+
+/* Floor applied to the rectified input voltage in the DCM feed-forward's
+ * divisor, so it stays finite through the zero crossing. Because
+ * currentReference is itself proportional to Vg, flooring the denominator
+ * makes the feed-forward taper smoothly to zero rather than blow up. Keep it
+ * small - above this the expression is exact. */
+#define PFC_DUTY_FF_VG_MIN              1.0f
 
 /* Selects how the mid-ON current sample is converted to a cycle average
  * before it reaches the current loop. Values are PFC_DCM_COMP_T (pfc.h):
@@ -231,11 +290,26 @@
 /* Specify PFC output voltage reference in V */
 #define PFC_OUPUT_VOLTAGE_NOMINAL       380.0f
 
-/* Precharge complete threshold in V.
- * The DC bus charges passively through the diode bridge + inrush resistor
- * until it reaches ~sqrt(2)*Vac_rms minus diode drops. For 230 Vrms input
- * this is ~325 V. Trip the relay safely below the expected peak. */
-#define PFC_PRECHARGE_THRESHOLD         280.0f
+/* Precharge complete threshold, as a FRACTION of the rectified input peak
+ * (sqrt(2)*Vrms, taken from vacRMS.sqrOutput).
+ *
+ * The bus charges passively through the diode bridge + inrush resistor and
+ * asymptotes at the rectified peak minus the bridge drops (~321 V measured at
+ * 230 Vrms, i.e. 98.7% of the ideal 325.3 V peak). Closing the relay short-
+ * circuits the inrush resistor across whatever gap is left, so the surge is
+ * proportional to that gap: SiL 2026-07-26 showed the old fixed 280 V
+ * threshold closing 33 V short of the asymptote and drawing 23 A.
+ *
+ * A fraction rather than a fixed voltage because a fixed one cannot serve the
+ * declared input range: at PFC_INPUT_UNDER_VOLTAGE_LO (110 Vrms) the peak is
+ * only 156 V, so the old 280 V could never be reached and precharge would hang
+ * below ~200 Vrms.
+ *
+ * 0.97 leaves ~7 V of margin to the asymptote at 230 Vrms and ~2.5 V at
+ * 110 Vrms - the bridge drop is a fixed offset, so the margin shrinks with
+ * line but stays positive. Raising this toward 1.0 shrinks the surge further
+ * but risks precharge never completing. */
+#define PFC_PRECHARGE_PEAK_FRACTION     0.97f
         
 /* Specify Soft start ramp rate and ramp count .This is specified at the rate 
 of PFC control loop execution rate  */

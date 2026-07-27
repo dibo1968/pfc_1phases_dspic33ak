@@ -49,6 +49,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <math.h>       /* sqrtf, for the DCM branch of the duty feed-forward */
 #include "libq.h"
 #include "pfc.h"
 #include "pfc_calc_params.h"
@@ -61,6 +62,7 @@
 
 static float PFC_SignalRectification(PFC_MEASURE_VOLTAGE_T *);
 static float PFC_DcmAverageFactor(PFC_T *);
+static float PFC_DutyFeedForward(PFC_T *);
 static uint16_t PFC_ConductionModeDetect(PFC_T *);
 static void PFC_CurrentSampleCorrection(PFC_T *);
 static void PFC_Average(PFC_AVG_T *,float);
@@ -273,10 +275,22 @@ inline static void PFC_UpdateBoostDutyRatio(PFC_T *pfcData)
  */
 inline static void PFC_BurstModeUpdate(PFC_T *pfcData)
 {
-    if(pfcData->piVoltage.output < PFC_MIN_POWER)
+    /* Test the TOTAL power command, not piVoltage.output. Once the load
+       feed-forward carries the load, the voltage-PI output legitimately sits
+       near zero AT FULL LOAD, and testing it alone reads that as "no load" and
+       switches the converter off under load. SiL 2026-07-27 at loadFF gain 1.0:
+       the duty was forced to zero for 22% of the loaded run, in stretches up to
+       20 ms, while the feed-forward was asking for 375 W - an 11.4 Hz
+       relaxation oscillation with 12 V p-p on the bus. */
+    if(pfcData->powerCommand < PFC_MIN_POWER)
     {
         pfcData->duty = 0;
         pfcData->piCurrent.integralOut = 0;
+        /* The switch is held off, so the duty that produces the next current
+           sample is zero - keep dutyRatio consistent or the conduction-mode
+           detector and the DCM factor work off a duty that was never applied. */
+        pfcData->dutyRatio = 0;
+        pfcData->dutyFF = 0;
     }
 }
 /**
@@ -301,11 +315,29 @@ static PFC_CTRL_STATE_T PFC_StateInit(PFC_T *pfcData)
  */
 static PFC_CTRL_STATE_T PFC_StatePrecharge(PFC_T *pfcData)
 {
-    /** vdcAVG.output is the moving average of the measured bus voltage in V. */
-    if(pfcData->vdcAVG.output >= PFC_PRECHARGE_THRESHOLD)
+    /** The relay short-circuits the inrush resistor, so the surge it draws is
+        set by how far the bus still is from its passive asymptote - the
+        rectified input peak less the bridge drops. Referring the completion
+        point to that peak instead of to a fixed voltage both minimises the
+        surge and keeps precharge working across the declared input range
+        (see PFC_PRECHARGE_PEAK_FRACTION).
+
+        vacRMS.sqrOutput is Vrms^2, so the peak is sqrt(2*sqrOutput). Wait for
+        the first RMS and AC-offset windows to complete before trusting it:
+        until vacAVG converges, offsetVac is still 0 and rectifiedVac - hence
+        sqrOutput - is wrong on hardware, where the AC sense sits on a mid-
+        scale offset. Both windows close within 20 ms, long before the bus is
+        anywhere near the threshold. */
+    if((pfcData->vacRMS.status == 1) && (pfcData->vacAVG.status == 1))
     {
-        PFC_INRUSH_RELAY = 1;
-        return PFC_OFFSET_MEAS;
+        const float peak = sqrtf(2.0f * pfcData->vacRMS.sqrOutput);
+
+        /** vdcAVG.output is the moving average of the measured bus voltage. */
+        if(pfcData->vdcAVG.output >= (PFC_PRECHARGE_PEAK_FRACTION * peak))
+        {
+            PFC_INRUSH_RELAY = 1;
+            return PFC_OFFSET_MEAS;
+        }
     }
     return PFC_PRECHARGE;
 }
@@ -379,6 +411,8 @@ static PFC_CTRL_STATE_T PFC_StateCtrlRun(PFC_T *pfcData)
 static PFC_CTRL_STATE_T PFC_StateFault(PFC_T *pfcData)
 {
     pfcData->duty = 0;
+    pfcData->dutyRatio = 0;
+    pfcData->dutyFF = 0;
     HAL_PFCPWMDisableOutputs();
 
     /** Clear input under-voltage once the input recovers above the UV upper
@@ -466,14 +500,32 @@ void PFC_ParamsInit(PFC_T *pfcData)
     
     pfcData->vacAVG.sampleLimit = PFC_INPUT_FREQUENCY_COUNTER;
 
-/** Initialize PI controlling PFC Current Loop */    
+/** Initialize duty feed-forward. Set before the current-PI limits below,
+    which depend on whether it is active. */
+    pfcData->dutyFFEnable = PFC_DUTY_FF_ENABLE_DEFAULT;
+    pfcData->dutyRatio    = 0;
+    pfcData->dutyFF       = 0;
+    pfcData->powerCommand = 0;
+
+/** Initialize PI controlling PFC Current Loop */
     pfcData->piCurrent.kp = KP_I;
     pfcData->piCurrent.ki = KI_I;
 //    pfcData->piCurrent.kpScale = KP_I_SCALE;
 //    pfcData->piCurrent.kiScale = KI_I_SCALE;
-    pfcData->piCurrent.maxOutput = PFC_MAX_DUTY;
-    pfcData->piCurrent.minOutput = 0;
-    
+    if (pfcData->dutyFFEnable != 0u)
+    {
+        /* The PI is a trim on top of the feed-forward, so it must be able to
+           go negative, and a tight symmetric bound is the anti-windup. */
+        pfcData->piCurrent.maxOutput =  PFC_DUTY_TRIM_MAX;
+        pfcData->piCurrent.minOutput = -PFC_DUTY_TRIM_MAX;
+    }
+    else
+    {
+        /* Legacy: the PI supplies the whole duty. */
+        pfcData->piCurrent.maxOutput = PFC_MAX_DUTY;
+        pfcData->piCurrent.minOutput = 0;
+    }
+
 /** Initialize PI controlling PFC Voltage Loop */    
     pfcData->piVoltage.kp = KP_V;
     pfcData->piVoltage.ki = KI_V;
@@ -530,6 +582,9 @@ void PFC_ResetParams(PFC_T *pData)
 
     /** Initialize the duty cycle */
     pData->duty = 0;
+    pData->dutyRatio = 0;
+    pData->dutyFF = 0;
+    pData->powerCommand = 0;
 }
 
 /**
@@ -551,7 +606,9 @@ static float PFC_DcmAverageFactor(PFC_T *pData)
      *   DCM: the sample is ~Ipk/2, but the cycle-average is LOWER because the
      *        current idles at zero for part of the period:
      *          I_avg = (Ipk/2)*(d1+d2) = sample * (d1 / D_ideal),
-     *        with d1 = ON duty (piCurrent.output),
+     *        with d1 = the ON duty that produced this sample (dutyRatio - NOT
+     *        piCurrent.output, which is only the trim once the duty
+     *        feed-forward is enabled),
      *        D_ideal = (Vout-Vin)/Vout = boostDutyRatio, and
      *        (d1+d2) = d1/D_ideal < 1 in DCM.
      * Note d2 = d1*Vg/(Vo-Vg) assumes an ideal converter: the diode drop, DCR
@@ -560,7 +617,7 @@ static float PFC_DcmAverageFactor(PFC_T *pData)
 
     if (pData->boostDutyRatio > 0.0f)
     {
-        factor = pData->piCurrent.output / pData->boostDutyRatio;
+        factor = pData->dutyRatio / pData->boostDutyRatio;
 
         /* Losses/transients can push d1 past D_ideal; that must never inflate
          * the reading, so cap at unity. Under PFC_DCM_COMP_RATIO this cap is
@@ -592,7 +649,7 @@ static float PFC_DcmAverageFactor(PFC_T *pData)
  */
 static uint16_t PFC_ConductionModeDetect(PFC_T *pData)
 {
-    const float d  = pData->piCurrent.output;   /* duty that produced this sample */
+    const float d  = pData->dutyRatio;          /* duty that produced this sample */
     const float vg = pData->rectifiedVac;
     const float vo = pData->pfcVoltage.vdc;
 
@@ -666,8 +723,71 @@ static void PFC_CurrentSampleCorrection(PFC_T *pData)
     pData->averageCurrent = pData->iL * pData->sampleCorrFactor;
 }
 /**
+ * <B> Function: PFC_DutyFeedForward(PFC_T *pData)  </B>
+ *
+ * @brief Open-loop duty that delivers currentReference at the present
+ * operating point, so the current PI only has to trim losses instead of
+ * synthesising the whole (Vo-Vg)/Vo profile through its integrator.
+ * @param Pointer to the data structure containing PFC related variables
+ * @return feed-forward duty ratio in [0, PFC_MAX_DUTY]
+ * @example
+ * <code>
+ * pData->dutyFF = PFC_DutyFeedForward(pData);
+ * </code>
+ */
+static float PFC_DutyFeedForward(PFC_T *pData)
+{
+    /* CCM: the inductor volt-second balance fixes the duty independently of
+     * the current, so the ideal boost ratio IS the feed-forward. */
+    float ff = pData->boostDutyRatio;
+
+    /* DCM: volt-second balance no longer pins the duty - the average current
+     * is a static function of it,
+     *      I_avg = (Ts*Vg*d^2) / (2L*D_ideal)
+     * so the duty that open-loop delivers the reference is
+     *      d = sqrt( (2L/Ts) * Iref * D_ideal / Vg ).
+     * Substituting d = D_ideal shows the two branches meet exactly at the
+     * CCM/DCM boundary, so switching between them introduces no step.
+     * dcmDetected comes from PFC_CurrentSampleCorrection, which has already
+     * run this cycle. */
+    if (pData->dcmDetected != 0u)
+    {
+        /* Vg is floored, not tested: falling back to the CCM branch here would
+         * be badly wrong, because at the zero crossing D_ideal -> 1 while the
+         * demanded current is ~0 - that would command near-maximum duty into
+         * the notch. Flooring instead keeps the expression finite and, since
+         * currentReference is proportional to Vg, tapers ff smoothly to zero
+         * as Vg does. Above the floor the result is exact. */
+        float vg = pData->rectifiedVac;
+        float arg;
+
+        if (vg < PFC_DUTY_FF_VG_MIN)
+        {
+            vg = PFC_DUTY_FF_VG_MIN;
+        }
+        /* boostDutyRatio goes negative if Vg ever exceeds Vdc (sag, precharge),
+         * which would make the argument negative. */
+        arg = (PFC_TWO_L_OVER_TS * pData->currentReference
+               * pData->boostDutyRatio) / vg;
+        ff = (arg > 0.0f) ? sqrtf(arg) : 0.0f;
+    }
+
+    /* D_ideal exceeds PFC_MAX_DUTY either side of the zero crossing; the
+     * converter simply cannot follow there, so cap rather than command a duty
+     * the PWM will clip anyway. */
+    if (ff > PFC_MAX_DUTY)
+    {
+        ff = PFC_MAX_DUTY;
+    }
+    else if (ff < 0.0f)
+    {
+        ff = 0.0f;
+    }
+    return ff;
+}
+/**
  * <B> Function: PFC_CurrentControlLoop(PFC_T *pData)  </B>
- * 
+ *
  * @brief Function to execute current control loop of PFC
  * @param Pointer to the data structure containing PFC related variables
  * @return none
@@ -678,9 +798,10 @@ static void PFC_CurrentSampleCorrection(PFC_T *pData)
  */
 inline static void PFC_CurrentControlLoop(PFC_T *pData)
 {
+    float dutyRatio;
     float duty;
-    
-    /** Ensure PFC current  is not negative.*/ 
+
+    /** Ensure PFC current  is not negative.*/
     if (pData->iL < 0)
     {
         pData->iL  = PFC_IL_MIN;
@@ -688,7 +809,10 @@ inline static void PFC_CurrentControlLoop(PFC_T *pData)
     /** Calculate average current if converter operates in discontinuous
         conduction mode. In continuous conduction mode, measured current is
         used as is ,as average current is obtained. The method is selected by
-        pData->sampleCorrectionEnable (PFC_DCM_COMP_T). */
+        pData->sampleCorrectionEnable (PFC_DCM_COMP_T).
+        NOTE: this consumes pData->dutyRatio, which still holds the duty that
+        produced the present sample - it is only updated at the end of this
+        function. */
     PFC_CurrentSampleCorrection(pData);
 
     /* Populate the reference/input fields for logging. The PI update only
@@ -698,13 +822,37 @@ inline static void PFC_CurrentControlLoop(PFC_T *pData)
     pData->piCurrent.error = (pData->currentReference - pData->averageCurrent);
 
     PFC_ControllerPIUpdate(&pData->piCurrent);
-    
+
+    /** Total duty = feed-forward + PI trim. With the feed-forward enabled the
+        PI output is a small correction bounded by +/-PFC_DUTY_TRIM_MAX; with
+        it disabled dutyFF is zero and the PI spans 0..PFC_MAX_DUTY as before
+        (the limits are set to match in PFC_ParamsInit). */
+    pData->dutyFF = (pData->dutyFFEnable != 0u) ? PFC_DutyFeedForward(pData)
+                                                : 0.0f;
+    dutyRatio = pData->dutyFF + pData->piCurrent.output;
+
+    /** Clamp the SUM, and give the integrator back exactly what the clamp
+        removed (back-calculation anti-windup). The previous code slammed
+        integralOut to PI_I_OUT_MAX on saturation, which is wrong once the PI
+        output is a trim - and even without the feed-forward it discarded the
+        integrator state instead of holding it. */
+    if (dutyRatio > PFC_MAX_DUTY)
+    {
+        pData->piCurrent.integralOut -= (dutyRatio - PFC_MAX_DUTY);
+        dutyRatio = PFC_MAX_DUTY;
+    }
+    else if (dutyRatio < PFC_MIN_DUTY)
+    {
+        pData->piCurrent.integralOut += (PFC_MIN_DUTY - dutyRatio);
+        dutyRatio = PFC_MIN_DUTY;
+    }
+    pData->dutyRatio = dutyRatio;
+
     /** Calculate duty cycle of PWM that controls PFC in terms of PWM Period */
-    duty  = (pData->piCurrent.output * PFC_LOOPTIME_TCY);
+    duty  = (dutyRatio * PFC_LOOPTIME_TCY);
     if (duty  > PFC_MAX_DUTY_COUNTS)
     {
         pData->duty = PFC_MAX_DUTY_COUNTS;
-        pData->piCurrent.integralOut = PI_I_OUT_MAX;       
     }
     else if (duty  < PFC_MIN_DUTY_COUNTS)
     {
@@ -768,6 +916,9 @@ inline static void PFC_CurrentRefGenerate(PFC_T *pData)
         {
             powerCommand += pData->loadFF.powerFF;
         }
+        /* Published so burst control tests the real command - see
+           PFC_BurstModeUpdate. */
+        pData->powerCommand = powerCommand;
         pData->currentReference = (float)((powerCommand * pData->rectifiedVac * KMUL)
                             / pData->vacRMS.sqrOutput);
     }

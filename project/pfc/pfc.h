@@ -182,6 +182,24 @@ typedef struct
     float iL;
     float rectifiedVac;
     float outputVdc;
+    /** Total applied duty ratio for this cycle = dutyFF + piCurrent.output,
+        clamped to [PFC_MIN_DUTY, PFC_MAX_DUTY]. This is the d1 that produced
+        the NEXT current sample, so PFC_ConductionModeDetect and
+        PFC_DcmAverageFactor must read this and not piCurrent.output - with the
+        feed-forward enabled the PI output is only the trim. */
+    float dutyRatio;
+    /** Feed-forward part of dutyRatio. CCM: (Vo-Vg)/Vo. DCM: the duty that
+        open-loop delivers currentReference. Zero when dutyFFEnable is 0. */
+    float dutyFF;
+    /** Total power command driving the current reference: the voltage-loop
+        output plus the load feed-forward when enabled. Burst control MUST test
+        this and not piVoltage.output - with the feed-forward carrying the
+        load, the voltage-PI output legitimately sits near zero at full load. */
+    float powerCommand;
+    /** 1 = duty feed-forward active (default), 0 = the PI supplies the whole
+        duty (legacy behaviour). Writable at run time so both can be compared
+        on a single build, like sampleCorrectionEnable. */
+    uint16_t dutyFFEnable;
 }PFC_T;
 
 // </editor-fold> 
