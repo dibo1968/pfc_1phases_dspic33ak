@@ -59,6 +59,10 @@
 
 // <editor-fold defaultstate="collapsed" desc=" Global Variables ">
 
+/* TEMPORARY bring-up diagnostic - comment out to remove. Blinks LED2 from the
+   main loop to prove the loop is still being scheduled. See the block in main(). */
+#define MAIN_LOOP_ALIVE_BLINK
+
 // </editor-fold>
 
 // <editor-fold defaultstate="collapsed" desc="INTERFACE FUNCTIONS ">
@@ -80,11 +84,41 @@ int main (void)
     HAL_InitPeripherals();
 
     LED1 = 1;
+#ifdef MAIN_LOOP_ALIVE_BLINK
+    /* RD11 carries LD2 on the Digital Power PIM. ANSELD was already cleared in
+       SetupGPIOPorts(), so only the direction needs setting. */
+    TRISDbits.TRISD11 = 0;
+#endif
     PFC_ServiceInit();
     
     while(1)
     {
-        
+
+#ifdef MAIN_LOOP_ALIVE_BLINK
+        /* TEMPORARY bring-up diagnostic. LED1 is set once before this loop, so a
+           lit LED1 does not prove the loop is still being scheduled - a toggling
+           LED does. If nothing blinks, the 64 kHz ADC ISR is starving main() and
+           X2CScope_Communicate() never runs.
+
+           The LED pin differs by module, so drive all three candidates:
+             RD5  - firmware LED1, "LD2" on the Motor Control DIM
+             RC9  - firmware LED2, "LD3" on the Motor Control DIM
+             RD11 - "LD2" (red) on the Digital Power PIM, which has no LED on
+                    RD5 or RC9 at all. Its LD1 (green) is a power indicator and
+                    is not driven by the MCU.
+           Delete this block once the UART is up. */
+        {
+            static uint32_t aliveCount = 0;
+            if (++aliveCount >= 200000)
+            {
+                LED1 = !LED1;
+                LED2 = !LED2;
+                LATDbits.LATD11 = !LATDbits.LATD11;
+                aliveCount = 0;
+            }
+        }
+#endif
+
 #ifdef ENABLE_DIAGNOSTICS
         DiagnosticsStepMain();
 #endif
