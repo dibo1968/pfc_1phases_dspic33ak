@@ -50,5 +50,14 @@ Makefile-genesis.properties
 *.doc
 *.docx
 
+# MATLAB / Simulink generated files
+# Build and cache output regenerated on every model update.
+# NOTE: SimulinkProject/pfc_sf.mexw64 is deliberately TRACKED - the SiL model
+# needs the built S-function, so do not add *.mexw64 here.
+slprj/
+*.slxc
+*.slx.autosave
+*.asv
+
 
 
