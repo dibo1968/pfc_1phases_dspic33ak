@@ -39,11 +39,11 @@ readable everywhere.
 Display equations are numbered by chapter — `(1.4)` is the fourth in chapter 1 — so later
 sections can refer to them precisely instead of saying "as shown above".
 
-> **Conversion status.** **Chapters 1 and 2, §4.4–4.6 and §15.1 are complete** in this
-> style — numbered equations, explicit assumptions, step-by-step derivations, worked
-> numbers for this hardware, and a traps box per section. The remaining sections still use
-> the older terse ASCII form and read as a reference rather than a tutorial; they are being
-> converted incrementally, so expect the style to change mid-chapter in places.
+> **Conversion status.** **Chapters 1, 2, 9 and 11, plus §4.4–4.6 and §15.1, are complete**
+> in this style — numbered equations, explicit assumptions, step-by-step derivations,
+> worked numbers for this hardware, and a traps box per section. The remaining sections
+> still use the older terse ASCII form and read as a reference rather than a tutorial; they
+> are being converted incrementally, so expect the style to change mid-chapter in places.
 >
 > Where a chapter is only partly converted, equation numbers are reserved for the sections
 > still to come: §4 therefore starts at **(4.5)**, reserving 4.1 to 4.4 for §4.2–4.3.
@@ -1681,41 +1681,84 @@ OFF time for the diode to commutate and for the bootstrap/gate drive to recover.
 
 ## 9. Duty feed-forward
 
-> `PFC_DutyFeedForward()` — [pfc.c:738](project/pfc/pfc.c:738)
+> `PFC_DutyFeedForward()` — [pfc.c:828](project/pfc/pfc.c:828)
 
 ### 9.1 The problem it solves
 
-Without feed-forward, the current PI's *integrator* has to synthesise the entire
-`(Vo−Vg)/Vo` duty profile — a swing from ~0.14 to 1.0 and back, 100 times a second. An
-integrator only moves at `Ki·error` per tick, so tracking a ramp costs a **sustained**
-error:
+**The question.** The current loop already has a PI with an integrator, and an integrator
+has infinite DC gain. Why does it still need help tracking the duty profile?
 
-```
-e_sustained ≈ (dD/dt)/(KI_I/Ts)
-```
+#### Physical picture
 
-Measured in SiL at 375 W: **0.8…1.3 A of error on a 2.2 A peak reference — 31 % THD,
-PF 0.933**. This is a *velocity* error, not a tuning problem: no realistic `Ki` fixes it,
-because raising `Ki` far enough destabilises the loop.
+Because the target is not a constant — it is a *ramp*. §1.2 showed $D_{ideal}$ sweeping
+from 1.0 at the zero crossing to 0.144 at the line peak and back, 100 times a second, at
+up to 0.42 % of full duty per switching period. Infinite DC gain says nothing about
+tracking a moving target.
 
-Feeding the operating-point duty forward leaves the PI with only losses to trim. The
-measured result after the fix was **THD 31 % → 1.5 %**.
+#### Derivation: the velocity error
+
+A PI has infinite gain at DC but only *finite* gain at any non-zero frequency, so it
+tracks a ramp with a constant lag. Work out how big.
+
+In steady state the integrator alone must produce the ramp, since the proportional term
+would need a growing error to do so. Each tick the integrator advances by $k_i e$, so its
+rate of climb is $k_i e / T_s$. Setting that equal to the required duty slew:
+
+$$\frac{k_i\,e}{T_s} = \frac{dD}{dt}
+\;\;\Longrightarrow\;\;
+\boxed{\;e_{ss} = \frac{dD}{dt}\cdot\frac{T_s}{k_i}\;} \tag{9.1}$$
+
+This is a **velocity error** — the classic finite-velocity-constant lag of a type-1 loop.
+It is not a tuning defect: (9.1) says the only lever is $k_i$, and raising $k_i$ far enough
+to make it small destabilises the loop long before it helps.
+
+#### Numbers
+
+Using the peak slew from §1.2 and the shipped `KI_I`: [derived]
+
+$$e_{ss} = 269\ \mathrm{s^{-1}} \times \frac{15.625\ \mu s}{0.0022607} = 1.86\ \text{A}$$
+
+at the zero crossing, tapering as $\cos\omega t$ to zero at the line peak — on a reference
+whose *peak* is only 2.31 A (§2.2). SiL at 375 W measured **0.8–1.3 A of error across the
+cycle, 31 % THD, PF 0.933**, consistent with (9.1) evaluated away from the extreme.
+
+Feeding the operating-point duty forward leaves the PI with only losses and model error to
+trim. Measured result: **THD 31 % → 1.5 %**.
+
+> **Traps.**
+>
+> * **This is not fixed by better tuning.** (9.1) is a structural property of a type-1
+>   loop tracking a ramp. Feed-forward changes the *reference* the loop has to follow, not
+>   the loop's ability to follow it.
+> * **The error is worst where the current is smallest.** Both peak at the zero crossing,
+>   so the relative error — and hence the distortion — is concentrated exactly where
+>   crossover distortion already lives.
 
 ### 9.2 The two branches
 
-```
-CCM :   d_ff = D_ideal = (Vo − Vg)/Vo
-DCM :   d_ff = sqrt( (2L/Ts) · i_ref · D_ideal / Vg )
-```
+**The question.** What duty should be fed forward? The answer differs fundamentally
+between conduction modes, because the two plants are different (§1.4).
 
-The CCM branch is just volt-second balance (§1.2): in CCM the duty is fixed by the voltage
-ratio *independently of the current*, so the ideal ratio **is** the correct feed-forward.
+#### CCM
 
-The DCM branch inverts the DCM average-current law of §1.4. In DCM volt-second balance no
-longer pins the duty, so the feed-forward must be *current-dependent* — and it is the
-reference, not the measurement, that is inverted (open-loop by construction).
+Volt-second balance pins the duty independently of the current (1.3b), so the ideal ratio
+*is* the correct feed-forward — no current term at all:
 
-> [pfc.c:770](project/pfc/pfc.c:770)
+$$d_{ff}^{\,CCM} = D_{ideal} = \frac{V_o - V_g}{V_o} \tag{9.2}$$
+
+#### DCM
+
+Here volt-second balance no longer pins anything; the duty is free and the current is a
+static function of it. So the feed-forward must invert that function. Taking (1.10) and
+solving for $d_1$ — which is exactly (1.12), evaluated at the *reference* rather than the
+measurement:
+
+$$d_{ff}^{\,DCM} = \sqrt{\frac{2L}{T_s}\cdot\frac{i_{ref}\,D_{ideal}}{V_g}} \tag{9.3}$$
+
+Using $i_{ref}$ rather than $i_L$ is what makes this a feed-forward: it is open-loop by
+construction, computed from where we *want* to be, not where we are.
+
+> [pfc.c:860](project/pfc/pfc.c:860)
 > ```c
 > arg = (PFC_TWO_L_OVER_TS * pData->currentReference * pData->boostDutyRatio) / vg;
 > ff  = (arg > 0.0f) ? sqrtf(arg) : 0.0f;
@@ -1723,19 +1766,39 @@ reference, not the measurement, that is inverted (open-loop by construction).
 
 ### 9.3 Continuity at the boundary
 
-Substituting `i_ref = ΔI/2 = (Ts·Vg/2L)·D_ideal` (the boundary current) into the DCM
-expression:
+**The question.** Two different formulas, selected by a mode detector that will inevitably
+chatter near the boundary. Does switching between them step the duty?
 
-```
-d_ff = sqrt( (2L/Ts) · (Ts·Vg·D_ideal/2L) · D_ideal / Vg ) = sqrt(D_ideal²) = D_ideal
-```
+#### Derivation
 
-— identical to the CCM branch. **The composite feed-forward is continuous across the
-CCM/DCM boundary** [derived], so mode switching introduces no duty step. This also removed
-a ~1 A current step that had been observed at boundary crossings when a carried-over duty
-sat above `D_ideal`.
+Evaluate (9.3) at the boundary, where by (1.7) the reference current is exactly
+$\Delta I/2 = (T_sV_g/2L)\,D_{ideal}$:
+
+$$d_{ff}^{\,DCM} = \sqrt{\frac{2L}{T_s}\cdot\frac{1}{V_g}
+  \cdot\underbrace{\frac{T_s V_g D_{ideal}}{2L}}_{i_{ref}\text{ at the boundary}}\cdot D_{ideal}}$$
+
+Every factor outside $D_{ideal}$ cancels — $2L/T_s$ against $T_s/2L$, and $V_g$ against
+$1/V_g$:
+
+$$d_{ff}^{\,DCM} = \sqrt{D_{ideal}^{\,2}} = D_{ideal} = d_{ff}^{\,CCM} \tag{9.4}$$
+
+**The composite feed-forward is continuous across the CCM/DCM boundary.** [derived] The
+two branches meet exactly, so mode-detector chatter costs nothing — the duty is the same
+either way at the point where the decision is ambiguous.
+
+This is the same continuity established in §1.4, seen from the other direction, and it is
+not a coincidence: both branches descend from the same volt-second physics. It also
+removed a ~1 A current step previously observed at boundary crossings, where a carried-over
+duty sat above $D_{ideal}$.
+
+> **Trap.** Continuity holds only if **both** branches use the same $D_{ideal}$ and the
+> same $V_g$ from the same cycle. Feeding one branch a filtered value and the other an
+> instantaneous one would reintroduce the step.
 
 ### 9.4 Guards
+
+**The question.** Equation (9.3) contains a division by $V_g$ and a square root, and $V_g$
+goes to zero twice per cycle. What stops it exploding?
 
 ```c
 if (vg < PFC_DUTY_FF_VG_MIN /* 1.0 V */) vg = PFC_DUTY_FF_VG_MIN;
@@ -1743,24 +1806,33 @@ if (vg < PFC_DUTY_FF_VG_MIN /* 1.0 V */) vg = PFC_DUTY_FF_VG_MIN;
 if (ff > PFC_MAX_DUTY) ff = PFC_MAX_DUTY; else if (ff < 0.0f) ff = 0.0f;
 ```
 
-* **`Vg` is floored, not tested.** Falling back to the CCM branch at the zero crossing
-  would be badly wrong: there `D_ideal → 1` while the demanded current is ~0, so the CCM
-  branch would command near-maximum duty *into the notch*. Flooring keeps the expression
-  finite, and because `i_ref` is itself proportional to `Vg`, the numerator vanishes faster
-  than the floored denominator — `d_ff` tapers smoothly to zero. Above 1 V the expression
-  is exact.
-* **`boostDutyRatio < 0`** (i.e. `Vg > Vo` — a sag, or precharge) would make the argument
-  negative; the `arg > 0` test catches it.
-* **`D_ideal > PFC_MAX_DUTY`** on either side of the zero crossing is a region where the
-  converter simply cannot follow, so the value is capped rather than commanded and clipped.
+* **$V_g$ is floored, not tested.** The tempting alternative — detect the zero crossing
+  and fall back to the CCM branch — would be badly wrong: there $D_{ideal}\to1$ while the
+  demanded current is ~0, so (9.2) would command near-maximum duty *into the notch*.
+  Flooring keeps (9.3) finite instead, and because $i_{ref}$ is itself proportional to
+  $V_g$ via (2.4), the numerator vanishes *faster* than the floored denominator — so
+  $d_{ff}$ tapers smoothly to zero on its own. Above 1 V the expression is exact and the
+  floor never acts.
+* **$D_{ideal} < 0$** — i.e. $V_g > V_o$, during a sag or precharge (§1.2) — would make
+  the argument of the square root negative. The `arg > 0` test catches it.
+* **$D_{ideal} > $ `PFC_MAX_DUTY`** either side of the zero crossing is a region the
+  converter physically cannot follow (§1.2), so the value is capped rather than commanded
+  and then clipped by the PWM.
+
+> **Trap.** The floor is on $V_g$ *inside the DCM branch only*. `boostDutyRatio` is
+> computed from the unfloored measurement elsewhere, so the two are not interchangeable
+> when reading the code.
 
 ### 9.5 Runtime switch
 
 `PFC_DUTY_FF_ENABLE_DEFAULT = 1`, held in `pfcParam.dutyFFEnable` so the legacy behaviour
-(PI supplies the whole duty) can be A/B'd from X2C-Scope without a rebuild. Note that the
-PI's output limits are chosen at init time from this flag ([pfc.c:515](project/pfc/pfc.c:515)),
-so **toggling it at run time does not re-set the limits** — worth remembering when
-comparing methods on a live board. **[open]**
+(PI supplies the whole duty) can be A/B'd from X2C-Scope without a rebuild.
+
+> **Trap. [open]** The PI's output limits are chosen at init time from this flag
+> ([pfc.c:588](project/pfc/pfc.c:588)) — symmetric ±`PFC_DUTY_TRIM_MAX` when the
+> feed-forward is on, `0…PFC_MAX_DUTY` when it is off. **Toggling the flag at run time
+> does not re-set them**, so a live A/B comparison is not symmetric. Change the default and
+> rebuild if the comparison needs to be exact.
 
 ---
 
@@ -1835,50 +1907,99 @@ error directly — flagged in
 
 ## 11. Current-sample reconstruction (DCM/MCM)
 
-> `PFC_CurrentSampleCorrection()` — [pfc.c:691](project/pfc/pfc.c:691),
-> `PFC_DcmAverageFactor()` — [pfc.c:602](project/pfc/pfc.c:602)
+> `PFC_CurrentSampleCorrection()` — [pfc.c:781](project/pfc/pfc.c:781),
+> `PFC_DcmAverageFactor()` — [pfc.c:692](project/pfc/pfc.c:692)
 
 ### 11.1 The error being corrected
 
-Recall §3.2: **in CCM the mid-ON sample is exactly the cycle average.** In DCM it is not.
+**The question.** ACMC regulates the *cycle-average* current (§2.3), but the ADC takes one
+sample per period. When is that single sample equal to the average, and what happens when
+it is not?
 
-In DCM the sample at mid-ON reads approximately `Ipk/2` (half-way up the rising ramp),
-but the true cycle average is lower, because the current idles at zero for part of the
-period:
+#### Physical picture
 
-```
-sample  ≈ Ipk/2
-I_avg   = (Ipk/2)·(d1 + d2)
-       ⟹  I_avg = sample · (d1 + d2)  with  (d1 + d2) = d1/D_ideal < 1
-```
-
-So the correction factor is:
+In CCM the current is a straight ramp across the whole period, so the value at the
+mid-point of the ON interval sits exactly on the cycle average — which is why the sampling
+instant is placed there (§3.2). In DCM that stops being true, because the current spends
+part of the period sitting at zero:
 
 ```
-        factor = d1 / D_ideal  =  dutyRatio / boostDutyRatio      (capped to [0,1])
+   CCM: sample lands on the average        DCM: sample lands on Ipk/2, but the
+                                                average is dragged down by d3
+        /|    /|                                    /\
+       / |   / |                                   /  \
+   ---X--+--X--+---  <- sample = I_avg        ----X----\________
+     /   | /   |                                 /  ^   \       ^
+                                            sample=Ipk/2 |   idle at zero
+                                                    true average is lower
 ```
+
+#### Derivation
+
+The mid-ON sample reads half the peak, since the ramp starts from zero in DCM:
+
+$$i_{sample} \approx \frac{I_{pk}}{2}$$
+
+But the true cycle average, from step 3 of §1.4, is that same $I_{pk}/2$ scaled by the
+*conducting fraction* of the period:
+
+$$I_{avg} = \frac{I_{pk}}{2}(d_1 + d_2) = i_{sample}\cdot(d_1+d_2)$$
+
+and by identity (1.11) that fraction is $d_1/D_{ideal}$. So the reconstruction is a single
+multiply:
+
+$$\boxed{\;I_{avg} = i_{sample}\times\underbrace{\frac{d_1}{D_{ideal}}}_{\le\,1}\;}
+\tag{11.1}$$
+
+In CCM the factor is exactly 1 — $d_1 = D_{ideal}$ by (1.3b) — so the same expression is
+correct in both modes, and the cap at 1.0 enforces that.
 
 > ```c
 > factor = pData->dutyRatio / pData->boostDutyRatio;
 > if (factor > 1.0f) factor = 1.0f; else if (factor < 0.0f) factor = 0.0f;
 > ```
 
-**If this correction is omitted**, the loop over-reads the current by `1/(d1+d2)` and
-therefore settles at a current that same factor *below* reference — a systematic, angle-
-dependent gain error concentrated near the zero crossings, i.e. exactly where crossover
-distortion already lives.
+#### Numbers: how big is the error if you skip it?
+
+Take the deep-DCM operating point of §1.4 — $V_g = 100$ V, $d_1 = 0.20$: [derived]
+
+$$i_{sample} = \frac{I_{pk}}{2} = 0.230\ \text{A},
+\qquad I_{avg,\text{true}} = 0.0624\ \text{A},
+\qquad d_1/D_{ideal} = 0.271$$
+
+Uncorrected, the loop believes it has 0.230 A when it actually has 0.062 A — an over-read
+of **3.7×**. Since the loop drives its *belief* to the reference, the real current settles
+at **27 % of what was asked for**.
+
+And the factor is not a constant: it is 1.0 in CCM near the line peak and falls toward zero
+approaching the zero crossings, so the uncorrected error is a systematic, **angle-dependent
+gain error concentrated exactly where crossover distortion already lives**. That is why
+this is a distortion problem and not merely a scaling one.
+
+#### In the firmware
 
 The two operands must come from the right cycles, and they do (§3.3): `dutyRatio` is the
-duty that produced *this* sample (one cycle old), `boostDutyRatio` is *this* cycle's
-operating point.
+duty that produced *this* sample and is therefore one cycle old, while `boostDutyRatio` is
+*this* cycle's operating point.
 
-**[open]** `d2 = d1·Vg/(Vo−Vg)` assumes an ideal converter. The diode forward drop, winding
-DCR and `Rds_on` all stretch the real demagnetising time slightly, so the factor is
-marginally optimistic.
+> **Traps.**
+>
+> * **The factor uses the applied duty $d_1$, not the PI output.** With the feed-forward
+>   enabled the PI output is only a trim (§8.2); reading it here instead of `dutyRatio`
+>   would compute the factor from a fraction of the real duty.
+> * **[open] The model is lossless.** $d_2 = d_1V_g/(V_o-V_g)$ from (1.9) ignores the
+>   diode forward drop, winding DCR and $R_{ds(on)}$, all of which stretch the real
+>   demagnetising time. The factor is therefore marginally optimistic, and the correction
+>   slightly under-compensates.
+> * **The cap at 1.0 is doing real work.** Transients and losses can push $d_1$ above
+>   $D_{ideal}$ in genuine CCM, which without the cap would *amplify* the sample.
 
 ### 11.2 The three selectable methods
 
-`pfcParam.sampleCorrectionEnable` (a `PFC_DCM_COMP_T`, [pfc.h:126](project/pfc/pfc.h:126))
+**The question.** (11.1) says *what* to multiply by. It does not say *when* — and deciding
+whether this cycle was DCM is a separate problem with more than one defensible answer.
+
+`pfcParam.sampleCorrectionEnable` (a `PFC_DCM_COMP_T`, [pfc.h:154](project/pfc/pfc.h:154))
 is writable at run time so all three can be compared on one build:
 
 | Value | Name | Behaviour |
@@ -1901,21 +2022,42 @@ is writable at run time so all three can be compared on one build:
 > ```
 
 The difference between methods 1 and 2 is *only* the mode decision — the correction
-arithmetic is identical. Method 1 lets losses and transients (which push `d1` past
-`D_ideal`) decide the mode; method 2 does not.
+arithmetic of (11.1) is identical in both. The distinction matters because of *what
+evidence* each one trusts:
+
+* **Method 1 infers the mode from the correction itself.** If $d_1 < D_{ideal}$ the cap
+  does not bind, so it calls the cycle DCM. But $d_1$ falls below $D_{ideal}$ for reasons
+  that have nothing to do with conduction mode — losses raise the required duty, and
+  transients move it either way. The mode decision is therefore contaminated by exactly
+  the disturbances the loop exists to reject.
+* **Method 2 decides from a physical prediction** — the projected end-of-OFF-time current
+  (§10) tested against a fixed zero threshold — and only then applies the factor. The
+  evidence is independent of the controller's own output.
 
 `PFC_DCM_COMPENSATION_METHOD = 2` is the shipped default
-([pfc_userparams.h:239](project/pfc/pfc_userparams.h:239)).
+([pfc_userparams.h:287](project/pfc/pfc_userparams.h:287)).
+
+> **Trap.** Method 0 is *not* "no correction applied to a correct signal" — it is the
+> uncorrected 3.7× over-read of §11.1. It is the baseline for comparison, not a safe
+> fallback.
 
 ### 11.3 Instrumentation
+
+**The question.** Both mode detectors will chatter somewhere near the boundary. How do you
+see which one chatters less, on hardware, without a rebuild between runs?
 
 Three fields are published every cycle for exactly this comparison:
 
 | Field | Meaning |
 |---|---|
 | `dcmDetected` | 1 when the **active** method called this cycle DCM — log it to see how much each method chatters at the boundary |
-| `iValleyEst` | predicted end-of-OFF current in A; negative ⟹ DCM. Always computed |
-| `sampleCorrFactor` | the factor actually applied, i.e. `(d1+d2)`; 1.0 in CCM or when OFF |
+| `iValleyEst` | predicted end-of-OFF current in A; negative ⟹ DCM. **Always computed**, whichever method is active |
+| `sampleCorrFactor` | the factor actually applied, i.e. $d_1/D_{ideal}$; 1.0 in CCM or when the method is OFF |
+
+The second row is the useful one: because `iValleyEst` is evaluated unconditionally, a
+single run with method 1 driving the loop still records what method 2 *would* have decided,
+cycle by cycle. The comparison needs one capture, not two runs under conditions you then
+have to argue were identical.
 
 ---
 
