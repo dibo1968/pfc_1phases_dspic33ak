@@ -39,11 +39,11 @@ readable everywhere.
 Display equations are numbered by chapter — `(1.4)` is the fourth in chapter 1 — so later
 sections can refer to them precisely instead of saying "as shown above".
 
-> **Conversion status.** **Chapters 1, 2, 5, 6, 9, 10 and 11, plus §4.4–4.6 and §15.1, are
-> complete** in this style — numbered equations, explicit assumptions, step-by-step
-> derivations, worked numbers for this hardware, and a traps box per section. Chapters 3,
-> 7, 8, 12–14 and 16–20 still use the older terse ASCII form and read as a reference rather
-> than a tutorial; they are being converted incrementally.
+> **Conversion status.** **Chapters 1–3 and 5–11, plus §4.4–4.6 and §15.1, are complete**
+> in this style — numbered equations, explicit assumptions, step-by-step derivations,
+> worked numbers for this hardware, and a traps box per section. Chapters 12–14 and 16–20,
+> and §4.1–4.3, still use the older terse ASCII form and read as a reference rather than a
+> tutorial; they are being converted incrementally.
 >
 > Where a chapter is only partly converted, equation numbers are reserved for the sections
 > still to come: §4 therefore starts at **(4.5)**, reserving 4.1 to 4.4 for §4.2–4.3.
@@ -1004,10 +1004,13 @@ motivating this project. The 2.23 V pk-pk figure is the disturbance the voltage 
 
 ### 3.1 Execution model
 
+**The question.** Chapters 1–2 describe a continuous-time converter. The firmware is a
+sequence of discrete operations at fixed rates. What runs when, and at what rate?
+
 Everything in the control path runs in **one interrupt**: the ADC channel-1 (inductor
 current) conversion-complete ISR, at the PWM rate.
 
-> `PFC_ADCInterrupt()` — [pfc.c:114](project/pfc/pfc.c:114)
+> `PFC_ADCInterrupt()` — [pfc.c:116](project/pfc/pfc.c:116)
 > ```c
 > pfcParam.pfcVoltage.outputVoltage    = ADCBUF_VDC>>1;
 > pfcParam.pfcVoltage.acVoltage        = ADCBUF_PFC_VAC;
@@ -1019,16 +1022,25 @@ current) conversion-complete ISR, at the PWM rate.
 > ```
 
 `main()` runs only housekeeping: LED/button service and the X2C-Scope UART pump
-([main.c:94](project/main.c:94)).
+([main.c:125](project/main.c:125)).
 
 | Rate | Period | What runs |
 |---|---|---|
 | 64 kHz | 15.625 µs | ADC ISR: measurement, state machine, current loop, PWM update |
-| 5.33 kHz | 187.5 µs | voltage PI (`VOLTAGE_LOOP_EXE_RATE = 12`) |
+| 5.33 kHz | 187.5 µs | voltage PI (`VOLTAGE_LOOP_EXE_RATE = 12`), and the notch of §4.6 |
 | 16 kHz | 62.5 µs | X2C-Scope sampling (`PFC_DIAGNOSTICS_DECIMATION = 4`) |
 | 100 Hz | 10 ms | `vdcAVG` and `vacRMS` window completion |
 | 50 Hz | 20 ms | `vacAVG` (AC offset) window completion |
 | 1 kHz | 1 ms | Timer1 board service (buttons, LEDs) |
+
+Two consequences of the single-ISR design worth stating: nothing in the control path can
+block or be pre-empted, so timing is deterministic by construction; and every rate above is
+an exact integer division of 64 kHz, so no two loops can drift in phase relative to each
+other.
+
+> **Trap. [open]** The whole control path is in one 64 kHz ISR with no headroom analysis
+> recorded, and the DCM branch of §9 calls `sqrtf` on the critical path (review §3.2). The
+> deterministic timing is only a benefit if the worst-case path actually fits in 15.6 µs.
 
 ### 3.2 PWM and the sampling instant
 
@@ -1046,36 +1058,65 @@ ADC trigger    PG4TRIGA  = PFC_LOOPTIME_TCY − 50, CAHALF = 1 (second half of t
                           → ADC Trigger 2 (ADTR2EN1 = 1) → all four channels
 ```
 
-**Why the trigger sits where it does.** In centre-aligned mode the ON pulse is centred on
-the carrier's turning point, so a trigger placed 50 counts (≈16 ns) from the turning point
-samples the inductor current at the **middle of the ON interval**. That placement is not
-cosmetic — it is a hard prerequisite for the whole current-measurement scheme:
+#### Why the trigger sits where it does
 
-> **In CCM, the mid-ON sample is *exactly* the cycle average, for any duty.**
-> The inductor current is a triangle with valley `Iv` at the start of the ON interval and
-> peak `Ip` at its end. Its area over one period is
-> `½(Iv+Ip)·d·Ts + ½(Ip+Iv)·(1−d)·Ts = ½(Iv+Ip)·Ts`, so the average is `(Iv+Ip)/2` — which
-> is precisely the value the ramp takes at the midpoint of the ON interval. No filtering,
-> no correction, no duty dependence. [derived]
+In centre-aligned mode the ON pulse is centred on the carrier's turning point, so a trigger
+placed 50 counts (≈16 ns) before that point samples the inductor current at the **middle of
+the ON interval**. This placement is not cosmetic — it is a hard prerequisite for the whole
+current-measurement scheme, and it is worth proving rather than asserting.
 
-This is why a PFC that only ever runs in CCM needs no current reconstruction at all — and
-why everything in §11 exists purely to handle the DCM case, where the identity breaks.
+**Claim: in CCM the mid-ON sample is *exactly* the cycle average, for any duty.**
 
-**[open]** The exact hardware semantics of `CAHALF` in centre-aligned mode should be
-confirmed on the bench (scope the gate drive against an ADC-trigger test pin). Every
-result in §10 and §11 assumes mid-ON sampling; a sample taken elsewhere in the ON interval
-would bias the current loop by a duty-dependent factor.
+The inductor current in CCM is a triangle: it rises linearly from a valley $I_v$ at the
+start of the ON interval to a peak $I_p$ at its end, then falls linearly back to $I_v$. The
+area under a trapezoid is the mean of its two ends times its width, so summing the two
+intervals:
 
-**Actuation delay.** The ISR samples at mid-ON of cycle *n*, computes, and writes `PG4DC`;
-with `UPDMOD = 0` the value takes effect at the start of cycle *n+1*. The firmware
-accounts for this explicitly: `pfcParam.dutyRatio` is updated at the *end* of
-`PFC_CurrentControlLoop`, so when the next ISR reads it, it holds "the duty that produced
-the sample I am now looking at" — see the comment at [pfc.c:809](project/pfc/pfc.c:809)
-and the type documentation at [pfc.h:186](project/pfc/pfc.h:186).
+$$\int_0^{T_s}\! i_L\,dt = \underbrace{\frac{I_v+I_p}{2}dT_s}_{\text{ON}}
+   + \underbrace{\frac{I_p+I_v}{2}(1-d)T_s}_{\text{OFF}}
+   = \frac{I_v+I_p}{2}T_s$$
+
+so the cycle average is
+
+$$I_{avg} = \frac{I_v + I_p}{2} \tag{3.1}$$
+
+which is exactly the value a straight ramp from $I_v$ to $I_p$ takes at **its own
+midpoint** — the middle of the ON interval. No filtering, no correction, and critically **no
+dependence on $d$**. [derived]
+
+That single identity is why a PFC that only ever runs in CCM needs no current
+reconstruction at all, and why everything in §11 exists purely to handle DCM, where the
+current is no longer a triangle spanning the whole period and (3.1) breaks.
+
+#### Actuation delay
+
+The ISR samples at mid-ON of cycle $n$, computes, and writes `PG4DC`; with `UPDMOD = 0`
+the value takes effect at the start of cycle $n+1$. Combined with the half-period average
+staleness of the sample-and-hold, this is the ~1.5 $T_s$ delay budget that §15.1 uses to
+justify halving the current-loop gains.
+
+The firmware handles the resulting one-cycle skew explicitly: `pfcParam.dutyRatio` is
+updated at the *end* of `PFC_CurrentControlLoop`, so when the next ISR reads it, it holds
+"the duty that produced the sample I am now looking at" — see [pfc.c:939](project/pfc/pfc.c:939)
+and the field documentation at [pfc.h:214](project/pfc/pfc.h:214).
+
+> **Traps.**
+>
+> * **[open] The `CAHALF` semantics are unconfirmed on hardware.** Scope the gate drive
+>   against an ADC-trigger test pin. Every result in §10 and §11 assumes mid-ON sampling;
+>   a sample taken elsewhere in the ON interval would bias the current loop by a
+>   *duty-dependent* factor — which, since $d$ sweeps the full range every half cycle
+>   (§1.2), is a distortion mechanism rather than a gain error.
+> * **(3.1) holds only in CCM.** It needs the current to be a single triangle spanning the
+>   whole period. The moment there is an idle interval $d_3$ (§1.4), the mid-ON sample
+>   reads $I_{pk}/2$ and the average does not.
 
 ### 3.3 State machine
 
-> `PFC_StateMachine()` — [pfc.c:166](project/pfc/pfc.c:166); enum at [pfc.h:103](project/pfc/pfc.h:103)
+**The question.** The control law of chapters 5–11 assumes a charged bus, a known current
+offset and a valid $V_{rms}^2$. None of those exist at power-on. What sequences them?
+
+> `PFC_StateMachine()` — [pfc.c:168](project/pfc/pfc.c:168); enum at [pfc.h:131](project/pfc/pfc.h:131)
 
 ```mermaid
 stateDiagram-v2
@@ -1089,13 +1130,13 @@ stateDiagram-v2
 ```
 
 `PFC_UpdateMeasurements()` runs **before** the switch, in every state
-([pfc.c:171](project/pfc/pfc.c:171)) — the averages, RMS and rectification must keep
-running even while faulted, otherwise the recovery tests would never see the line come
-back.
+([pfc.c:173](project/pfc/pfc.c:173)) — the averages, RMS, rectification and the notch of
+§4.6 must keep running even while faulted, otherwise the recovery tests would never see the
+line come back, and the filters would have to re-settle on every recovery.
 
 `PFC_CTRL_RUN` is the closed-loop sequence, and the order matters:
 
-> [pfc.c:386](project/pfc/pfc.c:386)
+> [pfc.c:461](project/pfc/pfc.c:461)
 > ```c
 > PFC_UpdateCurrentFeedback(pfcData);   /* iL ← sample (− offset) */
 > PFC_FaultCheck(pfcData);              /* → PFC_FAULT on any fault */
@@ -1108,7 +1149,15 @@ back.
 
 The pairing is deliberate: `boostDutyRatio` is **fresh** (this cycle's operating point)
 while `dutyRatio` is **one cycle old** (the duty that actually produced the present
-sample). §11 depends on exactly that pairing.
+sample). §10 and §11 both depend on exactly that pairing — (10.1) and (11.1) each combine
+one of each.
+
+> **Trap.** The sequence is not arbitrary and cannot be reordered casually.
+> `PFC_UpdateBoostDutyRatio` must run *after* `PFC_CurrentRefGenerate` (which needs the
+> previous $D_{ideal}$ nowhere, but the multiplier's output feeds the DCM feed-forward) and
+> *before* `PFC_CurrentControlLoop` (which consumes the fresh $D_{ideal}$ in both (10.1)
+> and (9.3)). Moving `PFC_BurstModeUpdate` earlier would let it zero a duty that later code
+> then overwrites.
 
 ---
 
@@ -1544,20 +1593,23 @@ the converter.
 
 ### 7.1 Why
 
-The voltage loop is deliberately slow (§2.4). A load step therefore produces a bus
-excursion whose depth is set by how long the loop takes to react — tens of milliseconds.
-But the load current is *measurable*: `IL2` is the output/load current, sensed on the load
-path after the DC link.
+**The question.** §2.4 forces the voltage loop to be slow, and §15.3 puts its crossover at
+6.9 Hz. A load step therefore produces a bus excursion lasting tens of milliseconds. Can
+anything recover that without speeding the loop up?
 
-Adding the measured load power directly to the power command cancels the load disturbance
-in the bus power balance, leaving the slow voltage loop to trim only losses and modelling
-error:
+#### The idea
 
-```
-P_command = P_voltagePI + gain · Vo_avg · I_load_filt
-```
+Yes — because a *feedback* loop must wait for an error to appear before it can act, but a
+**feed-forward** path does not. The load current is directly measurable: `IL2` is the
+output current, sensed on the load path after the DC link. Adding the measured load power
+straight to the power command cancels the disturbance in the bus power balance (1.15)
+*before* it moves the bus at all:
 
-> Computed every ISR in `PFC_UpdateMeasurements()` — [pfc.c:206](project/pfc/pfc.c:206)
+$$P_{cmd} = P_{PI} + \underbrace{g\cdot V_{o,avg}\cdot I_{load,filt}}_{P_{FF}} \tag{7.1}$$
+
+leaving the slow voltage loop to trim only losses and modelling error.
+
+> Computed every ISR in `PFC_UpdateMeasurements()` — [pfc.c:214](project/pfc/pfc.c:214)
 > ```c
 > pfcData->loadFF.currentFilt += (pfcData->loadFF.current - pfcData->loadFF.currentFilt)
 >                                * pfcData->loadFF.filtCoeff;
@@ -1565,44 +1617,72 @@ P_command = P_voltagePI + gain · Vo_avg · I_load_filt
 >                                * pfcData->loadFF.currentFilt;
 > ```
 
-The filter is a first-order IIR with `α = PFC_LOAD_FF_FILT_COEFF = 0.05` at 64 kHz:
+The measurement is smoothed by a first-order IIR with
+$\alpha = \text{PFC\_LOAD\_FF\_FILT\_COEFF} = 0.05$ at 64 kHz:
 
-```
-f_corner ≈ α/(2π·Ts) = 0.05/(2π·15.625e-6) ≈ 509 Hz    [derived]
-```
+$$f_{corner} = \frac{-\ln(1-\alpha)}{2\pi T_s} = 523\ \text{Hz}
+\qquad\left(\text{the usual } \frac{\alpha}{2\pi T_s} = 509\ \text{Hz approximation is 2.6 \% low}\right)
+\tag{7.2}$$
 
-`Vo_avg` (not instantaneous `vdc`) is used deliberately, so bus ripple is not injected
-into the power command.
+$V_{o,avg}$ — not instantaneous `vdc` — is used deliberately, so the 100 Hz bus ripple of
+(2.5) is not injected into the power command, where by (2.7) it would become third-harmonic
+distortion.
 
 ### 7.2 Why the gain must be below 1.0
 
-This is the subtle part, and it is documented at length in
-[pfc_userparams.h:149](project/pfc/pfc_userparams.h:149). For any load whose current rises
-with bus voltage — a resistor being the worst case, `I = Vo/R`:
+**The question.** If the feed-forward cancels the load disturbance, why not set the gain to
+exactly 1.0 and cancel it completely?
 
-```
-P_FF  = gain·Vo·I = gain·Vo²/R
-P_out = Vo²/R
+#### Derivation: the bus loses its restoring force
 
-d(P_FF − P_out)/dVo = 2·(gain − 1)·Vo/R
-```
+Because the load itself is part of the bus's stability. Take the worst case — a resistive
+load, whose current *rises* with bus voltage, $I = V_o/R$:
 
-At `gain = 1.0` this derivative is **exactly zero**. The feed-forward has cancelled the
-load's own self-regulation — the term that normally restores the bus (a bus that sags
-draws less load power) — and the bus loses its restoring force. Simultaneously the voltage
-PI has nothing left to do and parks against its zero clamp, so it cannot trim downwards
-either. The result observed in SiL on 2026-07-27 was an **11.4 Hz limit cycle with 12.5 V
-pk-pk** on `vdcAVG`.
+$$P_{FF} = g\,V_o I = \frac{g\,V_o^2}{R},
+\qquad P_{out} = \frac{V_o^2}{R}$$
 
-Shipped value:
+The net power injected into the bus as a function of bus voltage is what determines whether
+a perturbation grows or decays. Differentiating:
 
-```
-PFC_LOAD_FF_GAIN = 0.9
-  → leaves −0.197 W/V of damping at 380 V into a 385 Ω load       [derived, matches source note]
-  → parks the voltage PI at ≈ 40 W, clear of the 1 W burst threshold
-  → still removes 90 % of a load step from the slow loop
+$$\frac{d\,(P_{FF} - P_{out})}{dV_o} = \frac{2(g-1)V_o}{R} \tag{7.3}$$
+
+At $g = 1.0$ this is **exactly zero**. Normally a bus that sags draws less load power and
+therefore recovers — that is the load's own self-regulation, and it is a genuine damping
+term. A unity feed-forward cancels it precisely: for every watt the load stops drawing, the
+feed-forward stops supplying one. The bus is left with no restoring force at all.
+
+Worse, it happens exactly when the voltage PI cannot help. With the feed-forward carrying
+the whole load, the PI output sits at zero and is **clamped there** by
+`piVoltage.minOutput = 0` (§5.3), so it cannot trim downwards either. Both restoring
+mechanisms are gone at once.
+
+Observed in SiL on 2026-07-27 at $g = 1.0$: an **11.4 Hz limit cycle, 12.5 V pk-pk** on
+`vdcAVG`.
+
+#### Numbers
+
+Shipped value $g = 0.9$ ([pfc_userparams.h:217](project/pfc/pfc_userparams.h:217)), at
+380 V into a 385 Ω load (= 375 W): [derived]
+
+| | value |
+|---|---|
+| residual damping, (7.3) | **−0.197 W/V** |
+| where the voltage PI parks, $(1-g)P$ | **37.5 W** — clear of the 1 W burst threshold (§12) |
+| load step removed from the slow loop | 90 % |
+
 0.8 is the documented fall-back if margin matters more than the last volt of dip.
-```
+
+> **Traps.**
+>
+> * **The danger is specific to loads whose current rises with $V_o$.** A constant-power
+>   load has the *opposite* sign of self-regulation (negative incremental resistance) and
+>   is already destabilising before any feed-forward is added — for that load 0.9 is not
+>   automatically safe either.
+> * **$g = 1$ fails silently at first.** Nothing is wrong in steady state; the loop only
+>   reveals itself as a limit cycle once perturbed. Bench-testing at fixed load will not
+>   find it.
+> * **(7.3) assumes the feed-forward is fast compared with the oscillation.** At 523 Hz
+>   against 11.4 Hz that holds comfortably here.
 
 ### 7.3 Status
 
@@ -1622,9 +1702,12 @@ when disabled, so it can be observed in X2C-Scope before being switched in.
 
 ## 8. Inner loop: current control
 
-> `PFC_CurrentControlLoop()` — [pfc.c:799](project/pfc/pfc.c:799)
+> `PFC_CurrentControlLoop()` — [pfc.c:889](project/pfc/pfc.c:889)
 
 ### 8.1 Sequence
+
+**The question.** This is where everything converges: the reference from §6, the
+reconstruction from §11, the feed-forward from §9. What is the order, and why that order?
 
 ```c
 if (pData->iL < 0) pData->iL = PFC_IL_MIN;   /* 0.0001 A floor: noise/offset guard */
@@ -1641,14 +1724,23 @@ dutyRatio     = pData->dutyFF + pData->piCurrent.output;
 ```
 
 Note the error is formed against `averageCurrent` — the *reconstructed* cycle average —
-not the raw sample. In CCM they are the same thing (§3.2); in DCM they differ by the
-factor derived in §11.
+not the raw sample. In CCM they are identical by (3.1); in DCM they differ by the factor
+of (11.1). The reconstruction must therefore run **before** the error is formed, which is
+why it is the first thing in the sequence.
+
+> **Trap.** The `iL < 0` floor is a noise/offset guard, not a physical statement — the
+> inductor current genuinely cannot go negative (the diode blocks), so a negative reading
+> means measurement error. Clamping to `PFC_IL_MIN = 0.0001` rather than 0 keeps it
+> strictly positive for the divisions downstream.
 
 ### 8.2 The PI is a trim, not the controller
 
+**The question.** With the feed-forward of §9 supplying the operating-point duty, what is
+left for the PI to do — and what should its limits be?
+
 With the duty feed-forward enabled the PI's job changes completely, and so do its limits:
 
-> [pfc.c:515](project/pfc/pfc.c:515)
+> [pfc.c:588](project/pfc/pfc.c:588)
 > ```c
 > if (pfcData->dutyFFEnable != 0u) {
 >     pfcData->piCurrent.maxOutput =  PFC_DUTY_TRIM_MAX;   /* +0.25 */
@@ -1659,13 +1751,28 @@ With the duty feed-forward enabled the PI's job changes completely, and so do it
 > }
 > ```
 
-The trim must be allowed to go **negative** (the feed-forward can overshoot), and the tight
-symmetric bound is itself the anti-windup: the PI only has to cover losses — measured at
-0.003…0.013 of duty in CCM — plus inductance/model error.
+The trim must be allowed to go **negative** — the feed-forward is a model and can overshoot
+— and the tight symmetric bound is itself a form of anti-windup: with the ramp removed from
+its job (§9.1), the PI only has to cover losses, measured at 0.003–0.013 of duty in CCM,
+plus inductance and model error. A ±0.25 bound is roughly 20× that, so it constrains only
+genuine faults.
+
+> **Trap. [open]** These limits are set **once, at init**, from `dutyFFEnable`. Toggling
+> the flag at run time leaves the previous limits in place (§9.5), so the legacy mode
+> reached that way is not the legacy mode as shipped.
 
 ### 8.3 Back-calculation anti-windup on the sum
 
-> [pfc.c:839](project/pfc/pfc.c:839)
+**The question.** The PI has its own clamp inside `PFC_ControllerPIUpdate`. Why is there a
+second, different anti-windup here?
+
+Because the quantity that actually saturates is not the PI output — it is the **sum**
+$d_{ff} + \text{trim}$. The feed-forward alone can reach `PFC_MAX_DUTY` near the zero
+crossing, where $D_{ideal}\to1$ (§1.2), and at that point the PI's own limits have not been
+reached at all. Clamping only the PI would let the sum exceed the achievable duty with
+nothing pushing back.
+
+> [pfc.c:931](project/pfc/pfc.c:931)
 > ```c
 > if (dutyRatio > PFC_MAX_DUTY) {
 >     pData->piCurrent.integralOut -= (dutyRatio - PFC_MAX_DUTY);
@@ -1677,19 +1784,29 @@ symmetric bound is itself the anti-windup: the PI only has to cover losses — m
 > pData->dutyRatio = dutyRatio;
 > ```
 
-The clamp is applied to `dutyFF + trim`, and the integrator is given back **exactly what
-the clamp removed**. This keeps the integrator on the boundary of feasibility instead of
-winding past it, and — unlike the PI's internal clamp — it does not destroy the
-accumulated state. It matters here because `dutyFF` alone can hit `PFC_MAX_DUTY` near the
-zero crossing (where `D_ideal → 1`), and the old behaviour (slamming `integralOut` to
-`PI_I_OUT_MAX`) would leave the trim saturated for many cycles afterwards.
+The clamp is applied to the sum, and the integrator is given back **exactly what the clamp
+removed**:
+
+$$\Delta I = d_{ratio} - d_{max}
+\;\;\Longrightarrow\;\;
+I \leftarrow I - \Delta I,\qquad d_{ratio} \leftarrow d_{max} \tag{8.1}$$
+
+This keeps the integrator sitting exactly on the boundary of feasibility rather than
+winding past it, and — unlike the PI's internal clamp (§5.1) — it preserves the accumulated
+state. The old behaviour, slamming `integralOut` to `PI_I_OUT_MAX`, left the trim saturated
+for many cycles after the excursion cleared.
 
 `dutyRatio` is written **after** the clamp, which is what makes it a faithful record of the
-duty that will actually be applied — the precondition for §10 and §11.
+duty that will actually be applied — the precondition for both (10.1) and (11.1).
+
+> **Trap.** Back-calculation here and clamping in §5.1 are *different* strategies, and the
+> difference is deliberate rather than an inconsistency: the current loop's saturation is
+> routine and recurs every line cycle, so it must recover cleanly; the voltage loop's is an
+> abnormal condition. That said, §5.1's approach is still flagged open.
 
 ### 8.4 Conversion to PWM counts
 
-> [pfc.c:852](project/pfc/pfc.c:852)
+> [pfc.c:942](project/pfc/pfc.c:942)
 > ```c
 > duty = (dutyRatio * PFC_LOOPTIME_TCY);
 > pData->duty = clamp(duty, PFC_MIN_DUTY_COUNTS, PFC_MAX_DUTY_COUNTS);
@@ -1701,8 +1818,16 @@ PFC_MAX_DUTY_COUNTS  = 0.95 × 49984 = 47484
 PFC_MIN_DUTY_COUNTS  = 0
 ```
 
-The 0.95 ceiling is a hardware limit, not a control one: the boost switch needs a minimum
-OFF time for the diode to commutate and for the bootstrap/gate drive to recover.
+The 0.95 ceiling is a **hardware** limit, not a control one: the boost switch needs a
+minimum OFF time for the diode to commutate and for the bootstrap/gate drive to recover.
+That distinction matters when reading §9.4 — the feed-forward is capped at 0.95 not because
+0.95 is enough duty, but because more is unusable. Near the zero crossing $D_{ideal}$
+genuinely exceeds it (§1.2), and no controller setting can change that.
+
+> **Trap.** The ceiling is applied twice — once on `dutyRatio` (§8.3, with back-calculation
+> so the integrator learns about it) and once again in counts here (a bare clamp). The
+> second is a belt-and-braces guard against rounding; if it ever binds when the first did
+> not, something upstream is wrong.
 
 ---
 
