@@ -39,14 +39,11 @@ readable everywhere.
 Display equations are numbered by chapter — `(1.4)` is the fourth in chapter 1 — so later
 sections can refer to them precisely instead of saying "as shown above".
 
-> **Conversion status.** **Chapters 1–3 and 5–11, plus §4.4–4.6 and §15.1, are complete**
-> in this style — numbered equations, explicit assumptions, step-by-step derivations,
-> worked numbers for this hardware, and a traps box per section. Chapters 12–14 and 16–20,
-> and §4.1–4.3, still use the older terse ASCII form and read as a reference rather than a
-> tutorial; they are being converted incrementally.
->
-> Where a chapter is only partly converted, equation numbers are reserved for the sections
-> still to come: §4 therefore starts at **(4.5)**, reserving 4.1 to 4.4 for §4.2–4.3.
+> **Conversion status.** **Chapters 1–14 and §15.1 are complete** in this style — numbered
+> equations, explicit assumptions, step-by-step derivations, worked numbers for this
+> hardware, and a traps box per section. §15.2–15.4 and chapters 16–20 remain in the older
+> reference form, which suits them: they are parameter tables, an operating-point map, the
+> gain derivations themselves, and lists of open items and references.
 >
 > If you are here to understand the loop tuning specifically, read
 > **§1.5 → §2.4 → §15.1 → §15.2–15.4**, in that order.
@@ -1044,6 +1041,10 @@ other.
 
 ### 3.2 PWM and the sampling instant
 
+**The question.** The control law is written in continuous time, but the switch is
+commanded once per period and the current is sampled once per period. Where in the period
+does each of those happen, and why does it matter so much?
+
 > [pwm.h:83](project/hal/pwm.h:83), [pwm.c:154](project/hal/pwm.c:154)
 
 ```
@@ -1165,6 +1166,9 @@ one of each.
 
 ### 4.1 ADC front end
 
+**The question.** Every equation so far assumes $V_g$, $V_o$ and $i_L$ are simply
+available. What actually produces them, and when?
+
 > [adc.h:68](project/hal/adc.h:68), [adc.c:75](project/hal/adc.c:75)
 
 | Signal | ADC channel | Pin | Raw macro | Format |
@@ -1174,61 +1178,104 @@ one of each.
 | `VDC` bus voltage | AD1CH0 | AD1AN6 / RA7 | `AD1CH0DATA<<4` | unipolar 0…65520 |
 | `IL2` load current | AD1CH3 | AD1AN7 / RA1 | `(AD1CH3DATA − 2048)<<4` | bipolar ±32768 |
 
-All four are triggered simultaneously from PWM4 Trigger 2; the ISR vector is the **IL**
-channel's completion interrupt, which guarantees the current sample is valid when the
-control code runs.
+All four are triggered simultaneously from PWM4 Trigger 2. Crucially the ISR vector is the
+**IL** channel's completion interrupt, not a timer — which guarantees the current sample is
+already valid when the control code runs, with no polling and no assumed conversion time.
 
-**[open]** Channels AD1CH0/CH1/CH3 share ADC core 1. If that core converts its channels
-sequentially in priority order, `IL2` (CH3) may still be converting when CH1's interrupt
-fires, making the load-current sample one cycle stale. This is harmless for its only
-consumer — the heavily filtered load feed-forward (§7) — but should be confirmed against
-the family reference manual before `IL2` is used for anything faster.
+> **Trap. [open]** Channels AD1CH0/CH1/CH3 share ADC core 1. If that core converts its
+> channels sequentially in priority order, `IL2` (CH3) may still be converting when CH1's
+> interrupt fires, making the load-current sample one cycle stale. Harmless for its only
+> consumer — the heavily filtered load feed-forward of §7, whose corner is 523 Hz against a
+> 15.6 µs skew — but confirm it against the family reference manual before `IL2` is used
+> for anything faster.
 
 ### 4.2 Scaling to engineering units
 
-Full-scale values come from the sensor front ends
-([pfc_userparams.h:104](project/pfc/pfc_userparams.h:104)):
+**The question.** The ADC produces integers. Everything downstream is in volts and amps.
+Where does the conversion happen, and what resolution does it leave?
 
-```
-Voltage divider   2.2k/(300k + 2.2k) = 0.00727995 ;  3.3 V / 0.00728 = 453 V full scale
-Current shunt     0.015 Ω, gain 3.1k/(560+39) = 5.1753 ; 1.65 V / (0.015·5.1753) = 21.3 A → 22 A
+#### Derivation: full-scale from the front ends
 
-ADC_VOLTAGE_SCALE = 453.0/32768 = 0.013824 V per count
-ADC_CURRENT_SCALE = 22.0/32768  = 0.000671 A per count
-```
+Each scale factor is the sensor chain worked backwards from the ADC's input range
+([pfc_userparams.h:108](project/pfc/pfc_userparams.h:108)):
 
-> [pfc.c:122](project/pfc/pfc.c:122)
+$$V_{base} = \frac{3.3\ \text{V}}{2.2\text{k}/(300\text{k}+2.2\text{k})}
+           = \frac{3.3}{0.00728} = 453\ \text{V}$$
+
+$$I_{base} = \frac{1.65\ \text{V}}{0.015\,\Omega \times 5.1753} = 21.3\ \text{A}
+\;\rightarrow\; 22\ \text{A}$$
+
+where 5.1753 is the shunt amplifier gain $3.1\text{k}/(560+39)$. Dividing by the signed
+15-bit range gives the per-count scales:
+
+$$\text{ADC\_VOLTAGE\_SCALE} = \frac{453.0}{32768} = 0.013824\ \text{V/count},
+\qquad
+\text{ADC\_CURRENT\_SCALE} = \frac{22.0}{32768} = 0.000671\ \text{A/count} \tag{4.1}$$
+
+> [pfc.c:124](project/pfc/pfc.c:124)
 > ```c
 > pfcParam.pfcVoltage.vdc = (float)(pfcParam.pfcVoltage.outputVoltage*ADC_VOLTAGE_SCALE);
 > pfcParam.pfcVoltage.vac = (float)(pfcParam.pfcVoltage.acVoltage*ADC_VOLTAGE_SCALE);
 > pfcParam.pfcCurrent.iL  = (float)(pfcParam.pfcCurrent.inductorCurrent*ADC_CURRENT_SCALE);
 > ```
 
-Note the `>>1` applied to `ADCBUF_VDC` in the ISR: the VDC macro produces a full 16-bit
-unsigned value, and the shift brings it back into the signed 15-bit range that
-`ADC_VOLTAGE_SCALE` is defined against. Net resolution: **0.111 V per 12-bit ADC LSB** on
-the bus, **0.0107 A per LSB** on the current. **[open]** The same `ADC_VOLTAGE_SCALE` is
-applied to both the AC and DC front ends; if the two dividers ever differ, this is the
-line to fix (see review §3.3/3.4).
+#### Numbers: what one ADC LSB is worth
+
+The converter is 12-bit but the raw macros left-shift by 4, and `ADCBUF_VDC` is then
+right-shifted by 1 to bring the unipolar value into the signed 15-bit range that (4.1) is
+defined against. So one *real* 12-bit LSB is 8 counts on the bus channel and 16 on the
+bipolar ones: [derived]
+
+$$\text{bus: } 8\times0.013824 = \mathbf{0.111\ V/LSB},
+\qquad
+\text{current: } 16\times0.000671 = \mathbf{0.0107\ A/LSB} \tag{4.2}$$
+
+The first figure is the one that matters for §4.6: it is the quantisation floor beneath any
+noise argument about the voltage feedback, and it is why a bare notch — which does no
+broadband averaging — needed the anti-noise pole added.
+
+> **Traps.**
+>
+> * **[open] The same `ADC_VOLTAGE_SCALE` serves both the AC and DC front ends.** That is
+>   only correct while the two dividers are identical. If they ever differ, this is the
+>   line to fix (review §3.3/3.4).
+> * **The `>>1` is not a rounding step, it is a range change.** Removing it would double
+>   every bus voltage in the control path.
 
 ### 4.3 AC offset removal and rectification
 
-The AC sense sits on a mid-scale bias, so the DC component of `vac` over a **full line
-period** *is* the offset:
+**The question.** The AC sense sits on a mid-scale bias so it can represent negative
+half-cycles. The multiplier (2.4) needs $|v_g|$ with no bias. How is the bias found without
+a calibration step?
 
-> `PFC_Average(&vacAVG, vac)` with `sampleLimit = PFC_INPUT_FREQUENCY_COUNTER = 64000/50 = 1280`
-> ([pfc.c:210](project/pfc/pfc.c:210), [pfc_userparams.h:87](project/pfc/pfc_userparams.h:87))
+#### Derivation
 
-```
-offsetVac    = mean of vac over 20 ms
-rectifiedVac = |vac − offsetVac|
-```
+By measuring it. Over a **full line period** the fundamental and every harmonic integrate
+to zero, so whatever DC remains *is* the bias:
 
-> `PFC_SignalRectification()` — [pfc.c:946](project/pfc/pfc.c:946)
+$$\text{offsetVac} = \frac{1}{N}\sum_{k} v_{ac}[k],
+\qquad N = \text{PFC\_INPUT\_FREQUENCY\_COUNTER} = \frac{64000}{50} = 1280 \tag{4.3}$$
 
-Averaging over exactly one line period is what makes this work: the fundamental and all
-its harmonics integrate to zero over an integer number of periods, so only the DC bias
-survives.
+$$\text{rectifiedVac} = \bigl|v_{ac} - \text{offsetVac}\bigr| \tag{4.4}$$
+
+Note the window is a **full** line period here, not the half period used for $V_{rms}^2$ in
+§4.4. Both are correct for their own purpose: (4.3) must reject the fundamental, which
+needs a whole period; (4.6) must reject $\cos2\omega t$, which needs only half of one.
+
+> `PFC_Average(&vacAVG, vac)` — [pfc.c:218](project/pfc/pfc.c:218),
+> [pfc_userparams.h:87](project/pfc/pfc_userparams.h:87);
+> `PFC_SignalRectification()` — [pfc.c:1036](project/pfc/pfc.c:1036)
+
+> **Traps.**
+>
+> * **This is why precharge waits for `vacAVG.status`** before trusting the measured peak
+>   (§13.1). Until the first 20 ms window closes, `offsetVac` is zero, so (4.4) returns
+>   $|v_{ac}|$ *including* the bias and every downstream quantity is wrong.
+> * **(4.3) rejects harmonics only over an integer number of line periods**, so it inherits
+>   the same 50 Hz compile-time assumption as §4.4 and §4.5.
+> * **The absolute value in (4.4) is not a diode model.** It is a mathematical rectifier on
+>   an already-rectified signal — the bridge is upstream — so it corrects for the sensing
+>   bias, not for the power path.
 
 ### 4.4 RMS-square of the input
 
@@ -1450,6 +1497,9 @@ On a 120 W → 375 W load step with gains unchanged: [derived]
 
 ### 5.1 The PI controller
 
+**The question.** Both loops use the same PI implementation. What exactly does it
+compute, and how does the discrete form relate to the continuous design of §15?
+
 One shared implementation for both loops:
 
 > `PFC_ControllerPIUpdate()` — [pfc_pi.c:68](project/pfc/pfc_pi.c:68)
@@ -1475,6 +1525,9 @@ absorbs the sample period as `ki_firmware = Ki_continuous · T_exec` — derived
 > proportional term alone saturates at only 15.7 V of error.
 
 ### 5.2 Execution rate and gain scheduling
+
+**The question.** The voltage loop does not run every ISR, and its integral gain is not
+constant. What sets the rate, and why is the gain scheduled?
 
 > `PFC_CurrentRefGenerate()` — [pfc.c:970](project/pfc/pfc.c:970)
 > ```c
@@ -1520,6 +1573,9 @@ The loop trades ~10 % of bandwidth for 13° of extra margin exactly when a large
 is in progress. (Both figures assume the notch of §4.6 is enabled.)
 
 ### 5.3 Output limits and the meaning of the output
+
+**The question.** The PI output is clamped to $[0, 1500]$. Those are not arbitrary
+numbers — what do they mean physically, and what does the lower one cost?
 
 ```
 piVoltage.minOutput = 0        → the PFC can never command negative power (no regeneration)
@@ -1686,6 +1742,9 @@ Shipped value $g = 0.9$ ([pfc_userparams.h:217](project/pfc/pfc_userparams.h:217
 
 ### 7.3 Status
 
+**The question.** The feed-forward is enabled by default in this build. Is that safe on
+hardware?
+
 ```
 PFC_LOAD_FF_ENABLE_DEFAULT = 1     (verified in SiL 2026-07-26)
 PFC_LOAD_CURRENT_SCALE     = ADC_CURRENT_SCALE   ← placeholder!
@@ -1805,6 +1864,9 @@ duty that will actually be applied — the precondition for both (10.1) and (11.
 > abnormal condition. That said, §5.1's approach is still flagged open.
 
 ### 8.4 Conversion to PWM counts
+
+**The question.** Everything so far produces a duty *ratio*. The PWM peripheral wants
+counts. What is the conversion, and where does the 0.95 ceiling come from?
 
 > [pfc.c:942](project/pfc/pfc.c:942)
 > ```c
@@ -1977,6 +2039,9 @@ if (ff > PFC_MAX_DUTY) ff = PFC_MAX_DUTY; else if (ff < 0.0f) ff = 0.0f;
 
 ### 9.5 Runtime switch
 
+**The question.** How is the feed-forward compared against the legacy behaviour without
+rebuilding — and is that comparison actually fair?
+
 `PFC_DUTY_FF_ENABLE_DEFAULT = 1`, held in `pfcParam.dutyFFEnable` so the legacy behaviour
 (PI supplies the whole duty) can be A/B'd from X2C-Scope without a rebuild.
 
@@ -2092,6 +2157,9 @@ eq. (4) and (6) — cited in [pfc.h:169](project/pfc/pfc.h:169). The mid-ON samp
 assumption in that paper matches this implementation exactly.
 
 ### 10.3 Always evaluated
+
+**The question.** Only one detector drives the loop at a time. Why compute the other one
+anyway?
 
 `PFC_ConductionModeDetect()` runs **every cycle regardless of the selected method**
 ([pfc.c:786](project/pfc/pfc.c:786)), and `iValleyEst` is published in the struct.
@@ -2282,7 +2350,10 @@ have to argue were identical.
 
 ## 12. Burst control at light load
 
-> `PFC_BurstModeUpdate()` — [pfc.c:276](project/pfc/pfc.c:276)
+**The question.** At what point is it better to stop switching altogether than to keep
+regulating?
+
+> `PFC_BurstModeUpdate()` — [pfc.c:350](project/pfc/pfc.c:350)
 
 ```c
 if(pfcData->powerCommand < PFC_MIN_POWER /* 1.0 W */) {
@@ -2293,26 +2364,46 @@ if(pfcData->powerCommand < PFC_MIN_POWER /* 1.0 W */) {
 }
 ```
 
-Below a threshold power there is nothing useful to do: switching losses dominate, the
-current reference is in the noise, and the bus is held by the passive rectifier path
-anyway. Holding the switch off and freezing the current integrator is both more efficient
-and better behaved than trying to regulate.
+#### Why stopping is better
 
-**The test must be on `powerCommand`, not `piVoltage.output`.** This was a real bug found
-in SiL on 2026-07-27: once the load feed-forward carries the load, the voltage-PI output
-legitimately sits near zero **at full load**. Testing it alone reads that as "no load" and
-switches the converter off *under load*. The observed symptom: duty forced to zero for
-22 % of the loaded run, in stretches up to 20 ms, while the feed-forward was asking for
-375 W — an **11.4 Hz relaxation oscillation with 12 V pk-pk** on the bus. `powerCommand`
-is published in the struct specifically so this test can see the true command
-([pfc.h:194](project/pfc/pfc.h:194)).
+Below a threshold power there is nothing useful left to do. Switching losses are roughly
+constant per cycle and become the dominant term; the current reference from (2.4) is down
+in the ADC quantisation noise of (4.2); and the bus is held by the passive rectifier path
+regardless. Holding the switch off and freezing the current integrator is both more
+efficient and better behaved than regulating a signal that is mostly noise.
 
-Setting `dutyRatio = 0` alongside `duty = 0` is equally deliberate: the switch is held off,
-so the duty that produces the *next* sample really is zero. Leaving `dutyRatio` stale would
-feed the conduction-mode detector and the DCM factor a duty that was never applied.
+#### The bug this section exists to record
 
-**[open]** The threshold has no hysteresis (review §2.7), so at a load hovering near 1 W
-the converter can chatter in and out of burst.
+**The test must be on `powerCommand`, not `piVoltage.output`.** Found in SiL on 2026-07-27,
+and it follows directly from §7.2: once the load feed-forward carries the load, the
+voltage-PI output legitimately sits near zero **at full load**. Testing it alone reads that
+as "no load" and switches the converter off *under load*.
+
+Observed symptom: duty forced to zero for **22 % of the loaded run**, in stretches up to
+20 ms, while the feed-forward was asking for 375 W — an 11.4 Hz relaxation oscillation with
+12 V pk-pk on the bus. `powerCommand` is published in the struct specifically so this test
+can see the true command ([pfc.h:227](project/pfc/pfc.h:227)).
+
+Note this is a *different* 11.4 Hz oscillation from the one in §7.2, with a different cause
+— that one was the loss of the bus restoring force at unity feed-forward gain, this one is
+relaxation between burst and regulation. Both were found in the same SiL session, and the
+coincidence of frequency is not meaningful: both are set by the same slow voltage-loop
+dynamics.
+
+#### Why `dutyRatio` is cleared too
+
+Equally deliberate. The switch is held off, so the duty that produces the *next* sample
+really is zero. Leaving `dutyRatio` stale would hand (10.1) and (11.1) a duty that was never
+applied — and both of those consume it as "the duty that produced this sample" (§3.3).
+
+> **Traps.**
+>
+> * **[open] The threshold has no hysteresis** (review §2.7), so a load hovering near 1 W
+>   can chatter in and out of burst. The `powerCommand` fix removed the large-signal
+>   version of this problem, not the small-signal one.
+> * **Freezing `integralOut` is not the same as clamping it.** The integrator keeps its
+>   value from before the burst, so regulation resumes from a sensible operating point
+>   rather than from zero.
 
 ---
 
@@ -2320,12 +2411,16 @@ the converter can chatter in and out of burst.
 
 ### 13.1 Precharge and the inrush relay
 
-> `PFC_StatePrecharge()` — [pfc.c:316](project/pfc/pfc.c:316)
+**The question.** At power-on the bus capacitor is empty and looks like a short circuit to
+the mains. How is it charged without drawing a destructive surge — and when is it safe to
+bypass the device that limits that surge?
 
-The bus charges *passively* through the diode bridge and an inrush resistor, asymptoting
-at the rectified peak minus the bridge drops. The relay then short-circuits the inrush
-resistor — so the surge it draws is proportional to **how far the bus still is from that
-asymptote**.
+> `PFC_StatePrecharge()` — [pfc.c:390](project/pfc/pfc.c:390)
+
+The bus charges *passively* through the diode bridge and an inrush resistor, asymptoting at
+the rectified peak minus the bridge drops. The relay then short-circuits the inrush
+resistor, and the surge *it* draws is proportional to **how far the bus still is from that
+asymptote** — so the whole question is when to close it.
 
 ```c
 if((pfcData->vacRMS.status == 1) && (pfcData->vacAVG.status == 1)) {
@@ -2337,7 +2432,7 @@ if((pfcData->vacRMS.status == 1) && (pfcData->vacAVG.status == 1)) {
 }
 ```
 
-Two design decisions here:
+#### Two design decisions
 
 * **The threshold is a fraction of the measured peak (0.97), not a fixed voltage.** A fixed
   threshold cannot serve the declared input range: at the 110 Vrms under-voltage limit the
@@ -2345,26 +2440,52 @@ Two design decisions here:
   hang below ~200 Vrms. SiL on 2026-07-26 showed that fixed threshold closing 33 V short of
   the asymptote and drawing **23 A**.
 * **It waits for both windows (`vacRMS.status` and `vacAVG.status`) before trusting the
-  peak.** Until `vacAVG` converges, `offsetVac` is still 0, so `rectifiedVac` — and hence
-  `sqrOutput` — is wrong on hardware, where the AC sense sits on a mid-scale bias. Both
-  windows close within 20 ms, long before the bus approaches the threshold.
+  peak.** This is a direct consequence of §4.3: until `vacAVG` converges, `offsetVac` is
+  still zero, so (4.4) returns $|v_{ac}|$ *including* the mid-scale bias, and `sqrOutput` —
+  and therefore the computed peak — is wrong on hardware. Both windows close within 20 ms,
+  long before the bus approaches the threshold, so the wait costs nothing.
 
-At 230 Vrms, 0.97 leaves ~7 V of margin to the asymptote; at 110 Vrms, ~2.5 V (the bridge
-drop is a fixed offset, so the margin shrinks with line but stays positive).
+#### Numbers
+
+Margin between the closing threshold and the asymptote, at the two ends of the input
+range: [derived]
+
+| line | peak $\hat V$ | threshold $0.97\hat V$ | margin to peak |
+|---|---|---|---|
+| 230 Vrms | 325.3 V | 315.5 V | 9.8 V, less ~2 V bridge drop ⇒ **~7 V** |
+| 110 Vrms | 155.6 V | 150.9 V | 4.7 V, less the same ⇒ **~2.5 V** |
+
+The bridge drop is a fixed offset while the margin scales with line, so the margin shrinks
+at low line but stays positive — which is the property that makes a *fractional* threshold
+work where a fixed one cannot.
+
+> **Traps.**
+>
+> * **Raising 0.97 toward 1.0 shrinks the surge but risks precharge never completing** —
+>   the asymptote is below the peak by the bridge drop, so the threshold must stay below
+>   $\hat V$ minus that drop at the *lowest* supported line.
+> * **The relay surge is not modelled anywhere.** The 23 A figure is a SiL observation, not
+>   a design calculation; the limiting resistance is the relay path plus capacitor ESR.
 
 ### 13.2 Current-offset measurement
 
-> `PFC_StateOffsetMeas()` — [pfc.c:350](project/pfc/pfc.c:350),
+**The question.** The current sensor has an offset. Measuring it requires a known current
+— and the only current we know exactly is zero.
+
+> `PFC_StateOffsetMeas()` — [pfc.c:424](project/pfc/pfc.c:424),
 > `PFC_MeasureCurrentOffset()` — [pfc_measure.c:89](project/pfc/pfc_measure.c:89)
 
-Averages `PFC_OFFSET_COUNT_MAX = 1024` samples (16 ms) of inductor current with the switch
-off, giving the sensor's zero-current reading. On completion the state also seeds
-`piVoltage.reference` with the **present** bus voltage, so soft start begins from where the
-bus actually is rather than from zero.
+With the switch off and the relay closed, the inductor current is zero, so whatever the
+sensor reads *is* the offset. Averaging `PFC_OFFSET_COUNT_MAX = 1024` samples (16 ms)
+suppresses noise by $\sqrt{1024} = 32\times$.
+
+On completion the state also seeds `piVoltage.reference` with the **present** bus voltage,
+so soft start begins from where the bus actually is rather than from zero — the bumpless
+transfer of §5.
 
 Offset subtraction is compiled out by default:
 
-> [pfc.c:228](project/pfc/pfc.c:228)
+> [pfc.c:298](project/pfc/pfc.c:298)
 > ```c
 > pfcData->iL = pfcData->pfcCurrent.iL;
 > #ifdef ENABLE_PFC_CURRENT_OFFSET_CORRECTION
@@ -2372,14 +2493,24 @@ Offset subtraction is compiled out by default:
 > #endif
 > ```
 
-The unconditional first line matters: an earlier version had the *whole* copy inside the
-`#ifdef`, so disabling offset correction silently disconnected the current feedback
-(review §1.3). In SiL the offset calibration is meaningless — the model injects an exactly
-zero-offset current — so it must stay disabled there.
+> **Traps.**
+>
+> * **The unconditional first line matters.** An earlier version had the *whole* copy
+>   inside the `#ifdef`, so disabling offset correction silently disconnected the current
+>   feedback entirely (review §1.3). The `#ifdef` must guard the *adjustment*, never the
+>   connection.
+> * **In SiL the calibration is meaningless and must stay disabled.** The model injects an
+>   exactly zero-offset current, so any measured "offset" is simulation noise that would
+>   then be subtracted from a correct signal.
+> * **Offset is measured once, at start-up.** Thermal drift afterwards is uncorrected.
 
 ### 13.3 Soft start
 
-> `PFC_SoftStartUpdate()` — [pfc.c:237](project/pfc/pfc.c:237)
+**The question.** At the end of precharge the bus sits at the rectified peak, ~325 V, and
+the target is 380 V. Stepping the reference straight there would demand maximum power
+instantly. What limits the ramp?
+
+> `PFC_SoftStartUpdate()` — [pfc.c:311](project/pfc/pfc.c:311)
 
 ```c
 if (reference < PFC_OUPUT_VOLTAGE_REFERENCE) {
@@ -2388,19 +2519,28 @@ if (reference < PFC_OUPUT_VOLTAGE_REFERENCE) {
 } else                 { reference = PFC_OUPUT_VOLTAGE_REFERENCE; }
 ```
 
-```
-RAMP_COUNT = PFC_VOLTAGE_BASE/32768 = 0.01382 V per step
-RAMP_RATE  = 5  → one step every 6 ISRs = 93.75 µs
-           ⟹ ramp rate ≈ 147 V/s                                      [derived]
-           ⟹ 325 V (passive peak) → 380 V takes ≈ 0.37 s              [derived]
-```
+Note the counter semantics: `rampRate` is reloaded with `RAMP_RATE` after each step and
+decremented on the intervening ticks, so a step occurs once every `RAMP_RATE + 1 = 6` ISRs,
+not every 5. [derived]
 
-**[open]** The rate is expressed in raw counts rather than V/s (review §2.6); a
-`PFC_SOFTSTART_VOLTS_PER_SEC` parameter would be clearer and would survive a change of
-`PFC_VOLTAGE_BASE`.
+$$\text{ramp} = \frac{\text{RAMP\_COUNT}}{(\text{RAMP\_RATE}+1)\,T_s}
+= \frac{0.01382\ \text{V}}{6\times15.625\ \mu s} = 147\ \text{V/s} \tag{13.1}$$
 
-Ramping the *reference* (rather than jumping it) keeps the voltage-PI error small, which
-keeps the power command — and hence the input current — bounded during start-up.
+$$t_{ramp} = \frac{380 - 325}{147} = 0.37\ \text{s} \quad\text{from the passive peak}$$
+
+Ramping the *reference* rather than jumping it is what keeps the voltage-PI error small,
+and by §5.3 the power command is proportional to that error — so a bounded ramp is what
+bounds the inrush current during start-up. It is the same trick as §9: give the loop a
+target it can follow instead of asking it to catch up.
+
+> **Traps.**
+>
+> * **[open] The rate is expressed in raw counts, not V/s** (review §2.6).
+>   `RAMP_COUNT = PFC_VOLTAGE_BASE/32768` means the ramp *silently changes* if
+>   `PFC_VOLTAGE_BASE` is ever re-derived for different divider values. A
+>   `PFC_SOFTSTART_VOLTS_PER_SEC` parameter would survive that.
+> * **`RAMP_RATE = 5` gives a divisor of 6.** Off-by-one here is a 20 % error in the ramp
+>   rate.
 
 ---
 
@@ -2408,11 +2548,16 @@ keeps the power command — and hence the input current — bounded during start
 
 ### 14.1 Fault detection
 
-> `PFC_FaultCheck()` — [pfc.c:1022](project/pfc/pfc.c:1022)
+**The question.** Which conditions must stop the converter, what are they tested against,
+and — the part that is easy to get wrong — what keeps a detector from latching a fault that
+has already cleared?
 
-The mask is **recomputed from scratch** each pass (`uint16_t faults = PFC_FAULT_NONE;`
-then `|=`), so faults can neither accumulate nor alias. Latching and recovery are the
-`PFC_FAULT` state's job, not the detector's.
+> `PFC_FaultCheck()` — [pfc.c:1112](project/pfc/pfc.c:1112)
+
+The mask is **recomputed from scratch** each pass (`uint16_t faults = PFC_FAULT_NONE;` then
+`|=`), so faults can neither accumulate nor alias. This is the separation of concerns that
+makes the rest work: the detector answers only "is this true *now*", while latching and
+hysteresis are the `PFC_FAULT` state's job (§14.2).
 
 | Bit | Fault | Test | Limit |
 |---|---|---|---|
@@ -2422,16 +2567,28 @@ then `|=`), so faults can neither accumulate nor alias. Latching and recovery ar
 | `1<<3` | `OP_UV` output under-voltage | `vdcAVG.output < 310 V`, **armed only after soft start reaches nominal** | |
 | `1<<4` | `IP_OC` input over-current | `\|iL\| ≥ PFC_INPUT_OVER_CURRENT_PEAK` | 12 Arms × √2 = 16.97 A |
 
-All the input tests work on **`Vrms²`**, never `Vrms` — the thresholds are pre-squared in
-[pfc_calc_params.h:71](project/pfc/pfc_calc_params.h:71), so no square root is ever taken
-in the fault path.
+All the input tests work on **$V_{rms}^2$**, never $V_{rms}$ — the thresholds are
+pre-squared in [pfc_calc_params.h:71](project/pfc/pfc_calc_params.h:71), so no square root
+is ever taken in the fault path. This follows directly from §4.4: the estimator produces
+$V_{rms}^2$ natively (4.6), so squaring the *constants* once at compile time is free while
+rooting the *signal* every ISR would not be.
 
 The `OP_UV` arming condition (`piVoltage.reference >= PFC_OUPUT_VOLTAGE_REFERENCE`) is
-essential: during the soft-start ramp the bus is *legitimately* below nominal.
+essential: during the soft-start ramp of §13.3 the bus is *legitimately* below nominal for
+0.37 s. Without the arming test, every start-up would trip output under-voltage.
+
+> **Trap.** `OP_OV` and `OP_UV` test `vdcAVG.output`, **not** `vdcFeedback`. Protection
+> deliberately keeps the heavily averaged signal of §4.5 rather than the notched one of
+> §4.6 — it wants noise immunity, not bandwidth, and a spurious trip is worse than a slow
+> one.
 
 ### 14.2 Recovery
 
-> `PFC_StateFault()` — [pfc.c:411](project/pfc/pfc.c:411)
+**The question.** A fault clears when the condition goes away. But the condition that
+caused the trip is often *marginal* — so what stops the converter oscillating between
+running and faulted?
+
+> `PFC_StateFault()` — [pfc.c:486](project/pfc/pfc.c:486)
 
 PWM off, duty and feed-forward zeroed, then each auto-recovering fault is cleared against
 its **own hysteresis limit** — never against its trip limit:
@@ -2444,21 +2601,33 @@ OP_UV clears when  vdcAVG    >= 320 V  (trip at 310 V)
 IP_OC never clears — latched until PFC_ServiceInit()
 ```
 
-On full clearance the integrators are zeroed, the reference is re-seeded to the present bus
-voltage (avoiding a step), and PWM is re-enabled.
+Every clear tests against a threshold *different from* the one that tripped — the
+separation between them is the hysteresis, and it is what prevents chatter at a marginal
+condition. On full clearance the integrators are zeroed, the reference is re-seeded to the
+present bus voltage (bumpless, §5), and PWM is re-enabled.
 
-Two subtleties:
+#### Two consequences worth understanding
 
-* **`IP_OC` is deliberately latching.** Once PWM is disabled the inductor current decays to
-  zero in microseconds, so *any* threshold-based clear would self-clear immediately —
-  giving an infinite retry into a short.
+* **`IP_OC` is deliberately latching, and it has to be.** Once PWM is disabled the inductor
+  current decays to zero in microseconds — so *any* threshold-based clear would succeed
+  immediately, giving an infinite retry into a short circuit. Over-current is the one fault
+  whose disappearance carries no information about whether the cause is gone.
 * **`OP_UV` recovery must sit below the passive bus level.** With PWM off the bus is capped
-  at the rectified peak (~325 V at 230 Vrms), so a 320 V recovery threshold auto-recovers at
-  nominal line but holds off at low line — a slow hiccup rather than a hard latch. This is
-  why the UV band (10 V) is narrower than the OV band (15 V).
+  at the rectified peak — ~325 V at 230 Vrms — so a 320 V recovery threshold auto-recovers
+  at nominal line but *holds off* at low line, where the passive peak is below it. That is
+  a slow hiccup rather than a hard latch, and it is why the UV band (320−310 = 10 V) is
+  deliberately narrower than the OV band (410−395 = 15 V): the UV band has a ceiling
+  imposed by physics that the OV band does not.
 
-**[open]** The names `..._LIMIT_LO/_HI` are inconsistent between the input and output
-faults (review §4.10); read the comparison, not the name.
+> **Traps.**
+>
+> * **[open] The `..._LIMIT_LO/_HI` names are inconsistent** between the input and output
+>   faults (review §4.10). Read the comparison, not the name.
+> * **Recovery re-seeds the reference but zeroes the integrators.** The bus voltage is
+>   preserved across the fault; the loop state is not. That is intentional — the state
+>   accumulated before a fault is not trustworthy afterwards.
+> * **Hysteresis protects against chatter, not against a genuinely marginal supply.** A
+>   line sitting at 129 Vrms will still hiccup, just slowly.
 
 ---
 
