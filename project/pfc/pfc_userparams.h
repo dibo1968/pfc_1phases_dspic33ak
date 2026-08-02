@@ -358,6 +358,22 @@
  * line but stays positive. Raising this toward 1.0 shrinks the surge further
  * but risks precharge never completing. */
 #define PFC_PRECHARGE_PEAK_FRACTION     0.97f
+
+/* Precharge timeout, in seconds. If the bus has not reached the completion
+ * threshold within this time, PFC_PRECHARGE latches PFC_FAULT_PRECHG and
+ * parks in PFC_FAULT with the relay still open - with any standing load on
+ * the DC bus, the passive R-C divider can settle BELOW the threshold forever,
+ * which would otherwise leave the (short-time-rated) inrush resistor
+ * dissipating indefinitely with no indication.
+ *
+ * Size it as >= ~5 x R_inrush x C_bus at low line, plus the 20 ms the RMS /
+ * AC-offset windows need before the threshold test is armed. With C = 1410 uF
+ * and a typical 10..50 ohm inrush resistor that is 90..370 ms, so 1 s is
+ * comfortable at any line the converter is declared for. */
+#define PFC_PRECHARGE_TIMEOUT_SEC       1.0f
+
+/* The same timeout in ISR ticks (the precharge state runs every ISR). */
+#define PFC_PRECHARGE_TIMEOUT_COUNT     (uint32_t)(PFC_PRECHARGE_TIMEOUT_SEC * PFC_PWMFREQUENCY_HZ)
         
 /* Specify Soft start ramp rate and ramp count .This is specified at the rate 
 of PFC control loop execution rate  */

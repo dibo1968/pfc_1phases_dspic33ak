@@ -146,6 +146,7 @@ typedef enum
     PFC_FAULT_OP_OV = (1u << 2),    /* Output over-voltage  */
     PFC_FAULT_OP_UV = (1u << 3),    /* Output under-voltage (auto-recover) */
     PFC_FAULT_IP_OC = (1u << 4),    /* Input over-current   (latched) */
+    PFC_FAULT_PRECHG = (1u << 5),   /* Precharge timeout    (latched) */
 }PFC_FAULT_TYPE_T;
 
 /** Selects how the mid-ON inductor current sample is turned into a cycle
@@ -237,6 +238,17 @@ typedef struct
         when vdcNotch.enable is set, otherwise vdcAVG.output. Precharge, the
         OV/UV trips and loadFF keep reading vdcAVG.output directly. */
     float vdcFeedback;
+    /** dutyFFEnable as last acted on by the current loop. Lets the loop
+        detect a run-time toggle and refresh the PI limits / hand the
+        operating point between integrator and feed-forward - the limits used
+        to be set only in PFC_ParamsInit, so toggling 1->0 at run time left
+        the PI clamped at +/-PFC_DUTY_TRIM_MAX and unable to supply the full
+        duty. Appended at the end of PFC_T: the SiL bus mirror copies field by
+        field, so appending leaves it valid. */
+    uint16_t dutyFFEnablePrev;
+    /** PFC_PRECHARGE dwell counter, in ISR ticks. Trips PFC_FAULT_PRECHG at
+        PFC_PRECHARGE_TIMEOUT_COUNT. Appended - see dutyFFEnablePrev. */
+    uint32_t prechargeCount;
 }PFC_T;
 
 // </editor-fold> 

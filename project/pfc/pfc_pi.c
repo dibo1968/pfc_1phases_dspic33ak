@@ -68,29 +68,45 @@
 void PFC_ControllerPIUpdate(PFC_PI_T *pPIParam)
 {
     float U;
-    
+
     pPIParam->integralOut = pPIParam->integralOut +
                            pPIParam->ki * pPIParam->error;
+
+    /** Anti-windup: bound the integral state ALONE to the output range, so it
+        can never demand more than the output is allowed to deliver. The
+        previous code instead assigned integralOut = the output limit whenever
+        the SUM P+I clipped - so a transient P spike loaded the integrator
+        with charge it never accumulated, which then bled back out at the Ki
+        rate as an output disturbance after every large error (worst for the
+        current PI in trim mode, where Kp*error alone can hit the +/-0.25
+        clamp near the zero crossing). */
+    if( pPIParam->integralOut > pPIParam->maxOutput )
+    {
+        pPIParam->integralOut = pPIParam->maxOutput;
+    }
+    else if( pPIParam->integralOut < pPIParam->minOutput )
+    {
+        pPIParam->integralOut = pPIParam->minOutput;
+    }
 
     pPIParam->propOut = pPIParam->kp * pPIParam->error;
 
     U  = pPIParam->integralOut + pPIParam->propOut ;
 
+    /** Clamp the output only; the integrator keeps its own (bounded) state. */
     if( U > pPIParam->maxOutput )
     {
         pPIParam->output = pPIParam->maxOutput;
-        pPIParam->integralOut = pPIParam->maxOutput;
     }
     else if( U < pPIParam->minOutput )
     {
         pPIParam->output = pPIParam->minOutput;
-        pPIParam->integralOut = pPIParam->minOutput;
     }
     else
     {
         pPIParam->output = U;
     }
-    
+
 }
 
 // </editor-fold>

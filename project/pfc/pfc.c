@@ -72,6 +72,7 @@ inline static void PFC_VdcFilterUpdate(PFC_T *);
 
 inline static void PFC_CurrentRefGenerate(PFC_T *);
 inline static void PFC_CurrentControlLoop(PFC_T *);
+static void PFC_CurrentPILimitsUpdate(PFC_T *);
 
 static void PFC_ParamsInit(PFC_T *);
 static void PFC_ResetParams(PFC_T *);
@@ -389,6 +390,20 @@ static PFC_CTRL_STATE_T PFC_StateInit(PFC_T *pfcData)
  */
 static PFC_CTRL_STATE_T PFC_StatePrecharge(PFC_T *pfcData)
 {
+    /** Timeout, latched: with any standing load on the DC bus the passive
+        R-C divider settles BELOW the completion threshold and this state
+        would otherwise wait forever - silently, with the short-time-rated
+        inrush resistor dissipating the load current. The relay is
+        deliberately left OPEN on the way out: closing it into a
+        half-charged bus is exactly the surge precharge exists to avoid, and
+        if the resistor is a self-protecting PTC the safe end state is
+        high-impedance, not bypassed. */
+    if (++pfcData->prechargeCount >= PFC_PRECHARGE_TIMEOUT_COUNT)
+    {
+        pfcData->faultStatus |= PFC_FAULT_PRECHG;
+        return PFC_FAULT;
+    }
+
     /** The relay short-circuits the inrush resistor, so the surge it draws is
         set by how far the bus still is from its passive asymptote - the
         rectified input peak less the bridge drops. Referring the completion
@@ -434,14 +449,28 @@ static PFC_CTRL_STATE_T PFC_StateOffsetMeas(PFC_T *pfcData)
             signal the PI closes on, so the initial error is exactly zero. */
         pfcData->piVoltage.reference = pfcData->vdcFeedback;
         pfcData->pfcVoltage.offsetVac = pfcData->vacAVG.output;
+        /** Restart the RMS window: status is sticky once set (nothing clears
+            it after a window completes), so without this PFC_WAIT_1CYCLE
+            would fall straight through in a single tick instead of waiting.
+            Restarting the accumulator mid-window costs no accuracy - vac^2
+            has period T/2, so a half-line window yields the exact RMS from
+            any starting phase. */
+        pfcData->vacRMS.sum = 0;
+        pfcData->vacRMS.samples = 0;
+        pfcData->vacRMS.status = 0;
         return PFC_WAIT_1CYCLE;
     }
     return PFC_OFFSET_MEAS;
 }
 /**
  * <B> Function: PFC_StateWait1Cycle(PFC_T *pfcData) </B>
- * @brief PFC_WAIT_1CYCLE: wait for the first RMS window to complete, then
- *        enable PWM and start closed-loop control. Returns the next state.
+ * @brief PFC_WAIT_1CYCLE: wait for one complete, freshly-started RMS window
+ *        (PFC_OFFSET_MEAS restarts it on the way in), then enable PWM and
+ *        start closed-loop control. This is a deterministic 10 ms at 50 Hz;
+ *        together with the ~16 ms offset-measurement window it also puts
+ *        ~26 ms between the inrush-relay close command and the first PWM
+ *        pulse, covering typical relay operate + bounce time. Returns the
+ *        next state.
  */
 static PFC_CTRL_STATE_T PFC_StateWait1Cycle(PFC_T *pfcData)
 {
@@ -517,9 +546,9 @@ static PFC_CTRL_STATE_T PFC_StateFault(PFC_T *pfcData)
     {
         pfcData->faultStatus &= (~PFC_FAULT_OP_UV);
     }
-    /** PFC_FAULT_IP_OC is latching: deliberately never cleared here, so an
-        over-current event holds the converter off until a reset
-        (PFC_ServiceInit). */
+    /** PFC_FAULT_IP_OC and PFC_FAULT_PRECHG are latching: deliberately never
+        cleared here, so an over-current event or a precharge timeout holds
+        the converter off until a reset (PFC_ServiceInit). */
     if(pfcData->faultStatus == PFC_FAULT_NONE)
     {
         pfcData->piVoltage.integralOut = 0;
@@ -582,22 +611,13 @@ void PFC_ParamsInit(PFC_T *pfcData)
     pfcData->dutyFF       = 0;
     pfcData->powerCommand = 0;
 
-/** Initialize PI controlling PFC Current Loop */
+/** Initialize PI controlling PFC Current Loop. The limits depend on
+    dutyFFEnable and are refreshed by the current loop whenever the flag is
+    toggled at run time - see PFC_CurrentPILimitsUpdate. */
     pfcData->piCurrent.kp = KP_I;
     pfcData->piCurrent.ki = KI_I;
-    if (pfcData->dutyFFEnable != 0u)
-    {
-        /* The PI is a trim on top of the feed-forward, so it must be able to
-           go negative, and a tight symmetric bound is the anti-windup. */
-        pfcData->piCurrent.maxOutput =  PFC_DUTY_TRIM_MAX;
-        pfcData->piCurrent.minOutput = -PFC_DUTY_TRIM_MAX;
-    }
-    else
-    {
-        /* Legacy: the PI supplies the whole duty. */
-        pfcData->piCurrent.maxOutput = PFC_MAX_DUTY;
-        pfcData->piCurrent.minOutput = 0;
-    }
+    PFC_CurrentPILimitsUpdate(pfcData);
+    pfcData->dutyFFEnablePrev = pfcData->dutyFFEnable;
 
 /** Initialize PI controlling PFC Voltage Loop */    
     pfcData->piVoltage.kp = KP_V;
@@ -675,6 +695,9 @@ void PFC_ResetParams(PFC_T *pData)
     pData->dutyRatio = 0;
     pData->dutyFF = 0;
     pData->powerCommand = 0;
+
+    /** Restart the precharge timeout dwell. */
+    pData->prechargeCount = 0;
 }
 
 /**
@@ -876,6 +899,35 @@ static float PFC_DutyFeedForward(PFC_T *pData)
     return ff;
 }
 /**
+ * <B> Function: PFC_CurrentPILimitsUpdate(PFC_T *pData)  </B>
+ *
+ * @brief Set the current-PI output limits to match the ACTIVE duty
+ * feed-forward mode. With the feed-forward on, the PI is a trim and the tight
+ * symmetric bound doubles as its anti-windup; with it off (legacy) the PI
+ * supplies the whole duty. Called from PFC_ParamsInit and again from
+ * PFC_CurrentControlLoop whenever dutyFFEnable is toggled at run time -
+ * setting the limits only at init left a run-time 1->0 toggle clamped at
+ * +/-PFC_DUTY_TRIM_MAX, unable to reach the ~0.15..0.95 duty the boost needs.
+ * @param Pointer to the data structure containing PFC related variables
+ * @return none
+ */
+static void PFC_CurrentPILimitsUpdate(PFC_T *pData)
+{
+    if (pData->dutyFFEnable != 0u)
+    {
+        /* The PI is a trim on top of the feed-forward, so it must be able to
+           go negative, and a tight symmetric bound is the anti-windup. */
+        pData->piCurrent.maxOutput =  PFC_DUTY_TRIM_MAX;
+        pData->piCurrent.minOutput = -PFC_DUTY_TRIM_MAX;
+    }
+    else
+    {
+        /* Legacy: the PI supplies the whole duty. */
+        pData->piCurrent.maxOutput = PFC_MAX_DUTY;
+        pData->piCurrent.minOutput = 0;
+    }
+}
+/**
  * <B> Function: PFC_CurrentControlLoop(PFC_T *pData)  </B>
  *
  * @brief Function to execute current control loop of PFC
@@ -904,6 +956,29 @@ inline static void PFC_CurrentControlLoop(PFC_T *pData)
         produced the present sample - it is only updated at the end of this
         function. */
     PFC_CurrentSampleCorrection(pData);
+
+    /** dutyFFEnable is documented as run-time writable (X2C A/B testing).
+        Detect a toggle, refresh the PI limits to match the new mode, and hand
+        the operating point between the integrator and the feed-forward so the
+        switch is approximately bumpless. The handover terms are estimates
+        (last cycle's dutyFF, this cycle's boostDutyRatio - the DCM branch is
+        lower); the trim clamp and the back-calculation below absorb the
+        residual within a few cycles. */
+    if (pData->dutyFFEnable != pData->dutyFFEnablePrev)
+    {
+        PFC_CurrentPILimitsUpdate(pData);
+        if (pData->dutyFFEnable != 0u)
+        {
+            /* FF takes over ~D_ideal of the duty; remove it from the PI. */
+            pData->piCurrent.integralOut -= pData->boostDutyRatio;
+        }
+        else
+        {
+            /* The PI must now supply what the FF was delivering. */
+            pData->piCurrent.integralOut += pData->dutyFF;
+        }
+        pData->dutyFFEnablePrev = pData->dutyFFEnable;
+    }
 
     /* Populate the reference/input fields for logging. The PI update only
      * consumes .error, so these are purely for a self-describing bus. */
