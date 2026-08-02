@@ -93,10 +93,58 @@
  * its harmonics, keeping them out of the voltage-loop error and hence out of
  * the current reference - this is what limits input-current (3rd-harmonic) THD.
  * 64 kHz / (2 x 50 Hz) = 640 samples = 10 ms.
- * NOTE: 5x the old 128-sample (2 ms) window - the voltage-loop feedback is now
- * slower and cleaner, so KP_V / KI_V may need bench re-verification. */
+ * NOTE: 5x the old 128-sample (2 ms) window. That cost phase margin: the
+ * window both averages (Tw/2) and holds (Th/2), so it contributes ~10 ms of
+ * delay, ~25 deg at the voltage-loop crossover. Measured against the physical
+ * plant 1/(C*Vo*s) the loop crosses at 6.9 Hz with PM ~54 deg on the old 2 ms
+ * window and only ~34 deg on this one. KP_V / KI_V are unchanged; the margin
+ * is recovered by the notch below instead. */
 #define PFC_VDC_AVG_SAMPLES             (PFC_PWMFREQUENCY_HZ/(2*PFC_INPUT_FREQUENCY))
-        
+
+/* ---- Vdc feedback notch + anti-noise pole (voltage-PI path only) ----------
+ * The block average above nulls the 100 Hz bus ripple structurally, but it
+ * does so by low-passing everything, which is where the ~25 deg of lag comes
+ * from. A 2nd-order notch reaches the same 100 Hz null for only ~4 deg,
+ * because it only has to be selective at 100 Hz rather than low-pass the whole
+ * band. A single real pole cascaded ahead of it restores the broadband noise
+ * averaging the boxcar was also providing - a bare notch gives none - for a
+ * further ~0.8 deg. Net: PM ~34 deg -> ~54 deg with KP_V / KI_V untouched.
+ *
+ * Only the voltage PI consumes this (PFC_T.vdcFeedback). Precharge, the OV/UV
+ * trips and the load feed-forward deliberately keep reading vdcAVG.output,
+ * which is slower but far more noise-immune.
+ *
+ * NOTE: tuned for a 50 Hz line. Off-tune the notch degrades faster than the
+ * boxcar: -34 dB at 101 Hz (1 % line error) against -80 dB, and only -10 dB at
+ * 120 Hz. At 50 Hz +/-1 % the resulting 100 Hz feedthrough into the power
+ * command is ~0.2 %, which is immaterial. On 60 Hz mains it is NOT adequate -
+ * retune f0 to 120 Hz along with PFC_INPUT_FREQUENCY, or leave this disabled. */
+
+/* 1 = notch + pole active (default), 0 = the voltage PI closes on
+ * vdcAVG.output exactly as before. Held in PFC_T.vdcNotch.enable so it is also
+ * writable at run time from X2C-Scope, like dutyFFEnable and loadFF.enable. */
+#define PFC_VDC_NOTCH_ENABLE_DEFAULT    1
+
+/* RBJ notch biquad, f0 = 100 Hz, Q = 1.0, fs = PFC_PWMFREQUENCY_HZ /
+ * VOLTAGE_LOOP_EXE_RATE = 5333.333 Hz:
+ *      w0 = 2*pi*f0/fs;  alpha = sin(w0)/(2*Q);  a0 = 1 + alpha
+ *      b = [1, -2cos(w0), 1] / a0;  a = [a0, -2cos(w0), 1-alpha] / a0
+ * Literals rather than a runtime sinf/cosf so the coefficients are exact and
+ * deterministic. DC gain is exactly 1.0 and the null at 100 Hz is exact.
+ * RE-DERIVE THESE if f0, Q or VOLTAGE_LOOP_EXE_RATE changes. */
+#define PFC_VDC_NOTCH_B0                0.944493355f
+#define PFC_VDC_NOTCH_B1               -1.875893116f
+#define PFC_VDC_NOTCH_B2                0.944493355f
+#define PFC_VDC_NOTCH_A1               -1.875893116f
+#define PFC_VDC_NOTCH_A2                0.888986709f
+
+/* Single real pole ahead of the notch, 500 Hz at the same 5333.333 Hz rate:
+ *      coeff = 1 - exp(-2*pi*fp/fs)
+ * Cuts broadband ADC noise to ~0.14x (the 640-sample boxcar gave 0.03x, a bare
+ * notch 1.0x) for ~0.8 deg of phase at 7 Hz. */
+#define PFC_VDC_NOTCH_LPF_COEFF         0.445145090f
+
+
 /* Counter for RMS calculation of rectified input AC voltage in terms of 
  * PWM clock period*/       
 #define PFC_RMS_SQUARE_COUNTMAX         (PFC_PWMFREQUENCY_HZ/(2*PFC_INPUT_FREQUENCY))      

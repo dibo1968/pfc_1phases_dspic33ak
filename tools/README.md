@@ -187,8 +187,10 @@ pfcData->myDebugSignal = whatever;
 
 Rebuild, **reprogram**, then `symbols myDebug` to confirm it resolved.
 
-> Do not reorder or delete existing `PFC_PI_T` fields. `project/pfc/pfc_pi.s` hardcodes
-> their byte offsets. Append new fields at the end of a struct.
+> Appending new fields at the end of a struct is always safe. *Deleting* or renaming one
+> also means deleting its copy from `SimulinkProject/pfc_bus_copy.h`, or the SiL build stops
+> compiling. (The old warning here about `project/pfc/pfc_pi.s` hardcoding `PFC_PI_T` byte
+> offsets no longer applies — that assembly PI was unused and was deleted 2026-08-02.)
 
 ### Log to CSV continuously instead of to screen
 

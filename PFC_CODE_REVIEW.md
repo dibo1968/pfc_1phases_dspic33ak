@@ -304,7 +304,7 @@ and tunable. Behaviour unchanged.
 
 ## 4. Readability / maintainability
 
-### 4.1 Dead / vestigial code  **[PARTIALLY FIXED 2026-07-23]**
+### 4.1 Dead / vestigial code  **[PARTIALLY FIXED 2026-07-23 · EXTENDED 2026-08-02]**
 
 > **Resolution (partial).** Removed the entire sample-correction feature: the
 > `PFC_CurrentSampleCorrection` function + forward declaration, the
@@ -312,11 +312,18 @@ and tunable. Behaviour unchanged.
 > unconditional `averageCurrent = iL`), and the `sampleCorrectionEnable` field + its
 > initialiser. Also fixed §1.2 by deletion.
 >
-> **Kept deliberately** (do **not** delete): `PFC_PI_T.propOut/input/kpScale/kiScale` —
-> `pfc_pi.s` hardcodes `PFC_PI_T` byte offsets (`.equ _kpScale,16` …), so changing that
-> struct's layout would silently corrupt the assembly PI if it is ever built.
-> `PFC_RMS_SQUARE_T.peak/peakcheck`, `PFC_T.samplePoint`, and `volatile boostDutyRatio`
-> are likely X2C-scope observables — §5 recommends *populating* them, not removing them.
+> ~~**Kept deliberately** (do **not** delete): `PFC_PI_T.propOut/input/kpScale/kiScale` —
+> `pfc_pi.s` hardcodes `PFC_PI_T` byte offsets.~~
+>
+> **Superseded 2026-08-02.** The user confirmed the assembly PI will not be used;
+> `project/pfc/pfc_pi.s` was deleted (it was absent from the MPLAB build, and its offsets
+> already assumed the old int16/Q15 layout, not the current float one). Six genuinely dead
+> fields were then removed: `PFC_PI_T.kpScale/.kiScale`, `PFC_AVG_T.scaler`,
+> `PFC_RMS_SQUARE_T.peak/.peakcheck`, `PFC_T.samplePoint` — each never read, and each
+> reporting a constant zero that reads like a real measurement on the scope.
+> **`propOut`, `input`, `pfcCurrent2` and `volatile boostDutyRatio` were kept**: all are
+> actively written and are genuine observables. The surviving layout constraint is the SiL
+> bus mirror, not the assembly — see the header comment in `SimulinkProject/pfc_bus_copy.h`.
 >
 > **`PFC_POWER_CONTROL` removed (2026-07-23, per go-ahead).** The `#ifdef`/`#endif` were
 > stripped so the current-reference calc is now unconditional (`pfc.c:567-571`,

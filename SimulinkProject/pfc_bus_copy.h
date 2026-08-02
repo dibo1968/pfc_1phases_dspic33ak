@@ -14,13 +14,26 @@
  * header valid if the bus is renamed or regenerated.
  *
  * Keep in sync with PFC_T in project/pfc/pfc.h and with pfc_bus_defs.m.
+ *
+ * DELIBERATE DIVERGENCE (2026-08-02). Six dead fields were deleted from the
+ * firmware structs - PFC_PI_T.kpScale/.kiScale, PFC_AVG_T.scaler,
+ * PFC_RMS_SQUARE_T.peak/.peakcheck and PFC_T.samplePoint - and the copies below
+ * went with them. They are intentionally still present in pfc_sf_bus.h,
+ * pfc_bus_defs.m and the generated readback in pfc_sf.c, because removing bus
+ * ELEMENTS shifts the positional busInfo[] indices in pfc_sf.c and needs a MEX
+ * regeneration, whereas leaving them costs nothing: they were only ever zero, so
+ * the unwritten bus elements read exactly as before. Drop them from the bus on
+ * the next occasion the S-Function is rebuilt in MATLAB anyway.
+ *
+ * Note the asymmetry when editing this file: APPENDING a firmware field is safe
+ * and requires nothing here; DELETING one requires deleting its copy here too,
+ * or this header stops compiling.
  */
 
 #define PFC_BUS_COPY_AVG(d, s)                                              \
     do {                                                                    \
         (d).sum         = (s).sum;                                          \
         (d).output      = (s).output;                                       \
-        (d).scaler      = (s).scaler;                                       \
         (d).samples     = (s).samples;                                      \
         (d).sampleLimit = (s).sampleLimit;                                  \
         (d).status      = (s).status;                                       \
@@ -32,8 +45,6 @@
         (d).sum         = (s).sum;                                          \
         (d).samples     = (s).samples;                                      \
         (d).sampleLimit = (s).sampleLimit;                                  \
-        (d).peak        = (s).peak;                                         \
-        (d).peakcheck   = (s).peakcheck;                                    \
         (d).status      = (s).status;                                       \
     } while (0)
 
@@ -47,8 +58,6 @@
         (d).error       = (s).error;                                        \
         (d).kp          = (s).kp;                                           \
         (d).ki          = (s).ki;                                           \
-        (d).kpScale     = (s).kpScale;                                      \
-        (d).kiScale     = (s).kiScale;                                      \
         (d).minOutput   = (s).minOutput;                                    \
         (d).maxOutput   = (s).maxOutput;                                    \
     } while (0)
@@ -87,7 +96,6 @@
 #define PFC_COPY_TO_BUS(dst, src)                                           \
     do {                                                                    \
         (dst)->duty                   = (src).duty;                         \
-        (dst)->samplePoint            = (src).samplePoint;                  \
         (dst)->averageCurrent         = (src).averageCurrent;               \
         (dst)->rampRate               = (src).rampRate;                     \
         (dst)->voltLoopExeRate        = (src).voltLoopExeRate;              \

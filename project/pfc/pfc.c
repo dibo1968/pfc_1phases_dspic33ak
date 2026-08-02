@@ -67,6 +67,8 @@ static uint16_t PFC_ConductionModeDetect(PFC_T *);
 static void PFC_CurrentSampleCorrection(PFC_T *);
 static void PFC_Average(PFC_AVG_T *,float);
 static void PFC_SquaredRMSCalculate(PFC_RMS_SQUARE_T *,float);
+static void PFC_VdcFilterReset(PFC_VDC_NOTCH_T *,float);
+inline static void PFC_VdcFilterUpdate(PFC_T *);
 
 inline static void PFC_CurrentRefGenerate(PFC_T *);
 inline static void PFC_CurrentControlLoop(PFC_T *);
@@ -198,6 +200,12 @@ inline static void PFC_UpdateMeasurements(PFC_T *pfcData)
     PFC_Average(&pfcData->vdcAVG, pVoltage->vdc);
     pfcData->outputVdc = pfcData->vdcAVG.output;
 
+    /** Notch + anti-noise pole on the same measurement, feeding the voltage PI
+        only. Updated in every state and whether or not it is enabled, so it
+        can be observed in X2C before being switched in - same idea as loadFF.
+        Must follow PFC_Average: the disabled path falls back to its output. */
+    PFC_VdcFilterUpdate(pfcData);
+
     /** Load-current feed-forward: low-pass the measured load current and form
         the feed-forward power (gain * Vdc * I_load). Injected into the voltage-
         loop power command in PFC_CurrentRefGenerate only when loadFF.enable is
@@ -215,6 +223,72 @@ inline static void PFC_UpdateMeasurements(PFC_T *pfcData)
 
     /** RMS-square of the rectified input voltage. */
     PFC_SquaredRMSCalculate(&pfcData->vacRMS, pfcData->rectifiedVac);
+}
+/**
+ * <B> Function: PFC_VdcFilterReset(PFC_VDC_NOTCH_T *pNotch, float value) </B>
+ * @brief Preload every filter state so the chain starts already settled at
+ *        value, instead of charging up from zero when control is handed over.
+ *        Valid as a fixed point because the DC gain is exactly 1: substituting
+ *        x1=x2=y1=y2=v into the difference equation returns v.
+ */
+static void PFC_VdcFilterReset(PFC_VDC_NOTCH_T *pNotch, float value)
+{
+    pNotch->lpfOut  = value;
+    pNotch->x1      = value;
+    pNotch->x2      = value;
+    pNotch->y1      = value;
+    pNotch->y2      = value;
+    pNotch->output  = value;
+    pNotch->exeRate = 0;
+}
+/**
+ * <B> Function: PFC_VdcFilterUpdate(PFC_T *pfcData) </B>
+ * @brief Anti-noise pole followed by the 100 Hz notch, run at the voltage-loop
+ *        rate, and selection of the signal the voltage PI closes on.
+ */
+inline static void PFC_VdcFilterUpdate(PFC_T *pfcData)
+{
+    PFC_VDC_NOTCH_T *pNotch = &pfcData->vdcNotch;
+
+    /* Decimate to the voltage-loop rate. Running the biquad at the full ISR
+       rate instead would place its poles at a radius of ~0.995, where float32
+       cancellation against the ~380 V DC pedestal limits the achievable null
+       to roughly -33 dB and throws away most of the benefit. This counter is
+       independent of voltLoopExeRate (which only advances in PFC_CTRL_RUN), so
+       the two run at the same rate with a constant offset of at most one ISR -
+       187.5 us, 0.4 deg at crossover, already inside the design margin. */
+    if (++pNotch->exeRate >= VOLTAGE_LOOP_EXE_RATE)
+    {
+        float x;
+        float y;
+
+        pNotch->exeRate = 0;
+
+        /* Real pole first: it keeps wideband ADC noise out of the notch, and
+           hence out of KP_V, which a notch on its own does nothing about. */
+        pNotch->lpfOut += (pfcData->pfcVoltage.vdc - pNotch->lpfOut)
+                          * pNotch->lpfCoeff;
+
+        /* Notch, direct form I. */
+        x = pNotch->lpfOut;
+        y = (pNotch->b0 * x)
+          + (pNotch->b1 * pNotch->x1)
+          + (pNotch->b2 * pNotch->x2)
+          - (pNotch->a1 * pNotch->y1)
+          - (pNotch->a2 * pNotch->y2);
+
+        pNotch->x2 = pNotch->x1;
+        pNotch->x1 = x;
+        pNotch->y2 = pNotch->y1;
+        pNotch->y1 = y;
+        pNotch->output = y;
+    }
+
+    /* Re-published every ISR rather than only on a filter tick, so toggling
+       enable at run time takes effect immediately and never leaves the PI
+       reading a selection made against the other source. */
+    pfcData->vdcFeedback = (pNotch->enable != 0u) ? pNotch->output
+                                                  : pfcData->vdcAVG.output;
 }
 /**
  * <B> Function: PFC_UpdateCurrentFeedback(PFC_T *pfcData) </B>
@@ -356,8 +430,9 @@ static PFC_CTRL_STATE_T PFC_StateOffsetMeas(PFC_T *pfcData)
     if((pCurrent->status == 1) && (pfcData->vacAVG.status == 1))
     {
         /** On first completion, set the output-voltage reference to the
-            measured DC voltage and enable soft start. */
-        pfcData->piVoltage.reference = pfcData->vdcAVG.output;
+            measured DC voltage and enable soft start. Seeded from the same
+            signal the PI closes on, so the initial error is exactly zero. */
+        pfcData->piVoltage.reference = pfcData->vdcFeedback;
         pfcData->pfcVoltage.offsetVac = pfcData->vacAVG.output;
         return PFC_WAIT_1CYCLE;
     }
@@ -449,7 +524,7 @@ static PFC_CTRL_STATE_T PFC_StateFault(PFC_T *pfcData)
     {
         pfcData->piVoltage.integralOut = 0;
         pfcData->piCurrent.integralOut = 0;
-        pfcData->piVoltage.reference = pfcData->vdcAVG.output;
+        pfcData->piVoltage.reference = pfcData->vdcFeedback;
         HAL_PFCPWMEnableOutputs();
         return PFC_CTRL_RUN;
     }
@@ -510,8 +585,6 @@ void PFC_ParamsInit(PFC_T *pfcData)
 /** Initialize PI controlling PFC Current Loop */
     pfcData->piCurrent.kp = KP_I;
     pfcData->piCurrent.ki = KI_I;
-//    pfcData->piCurrent.kpScale = KP_I_SCALE;
-//    pfcData->piCurrent.kiScale = KI_I_SCALE;
     if (pfcData->dutyFFEnable != 0u)
     {
         /* The PI is a trim on top of the feed-forward, so it must be able to
@@ -547,6 +620,19 @@ void PFC_ParamsInit(PFC_T *pfcData)
     pfcData->loadFF.gain        = PFC_LOAD_FF_GAIN;
     pfcData->loadFF.enable      = PFC_LOAD_FF_ENABLE_DEFAULT;
     pfcData->loadFF.currentFilt = 0;
+
+/** Initialize the Vdc notch + anti-noise pole feeding the voltage PI. The
+    coefficients live in the struct rather than being used as literals so they
+    can be retuned from X2C-Scope without a rebuild. */
+    pfcData->vdcNotch.b0       = PFC_VDC_NOTCH_B0;
+    pfcData->vdcNotch.b1       = PFC_VDC_NOTCH_B1;
+    pfcData->vdcNotch.b2       = PFC_VDC_NOTCH_B2;
+    pfcData->vdcNotch.a1       = PFC_VDC_NOTCH_A1;
+    pfcData->vdcNotch.a2       = PFC_VDC_NOTCH_A2;
+    pfcData->vdcNotch.lpfCoeff = PFC_VDC_NOTCH_LPF_COEFF;
+    pfcData->vdcNotch.enable   = PFC_VDC_NOTCH_ENABLE_DEFAULT;
+    PFC_VdcFilterReset(&pfcData->vdcNotch, 0.0f);
+    pfcData->vdcFeedback = 0;
 }
 /**
  * <B> Function: PFC_ResetParams(PFC_T *pData)  </B>
@@ -573,8 +659,12 @@ void PFC_ResetParams(PFC_T *pData)
     pData->vacAVG.samples = 0;
     pData->vacRMS.sum = 0;
     pData->vacRMS.samples = 0;
-    pData->vacRMS.peak = 0;
     pData->vacRMS.status = 0;
+
+    /** Re-settle the Vdc notch on the present measurement, so handing control
+        over later does not have to wait for it to charge up from zero. */
+    PFC_VdcFilterReset(&pData->vdcNotch, pData->pfcVoltage.vdc);
+    pData->vdcFeedback = pData->pfcVoltage.vdc;
 
     /** Initialize variables related to PI integrator */
     pData->piVoltage.integralOut = 0;
@@ -880,7 +970,7 @@ inline static void PFC_CurrentRefGenerate(PFC_T *pData)
         Voltage PI is called at the rate specified by VOLTAGE_LOOP_EXE_RATE */
     if (++pData->voltLoopExeRate >= VOLTAGE_LOOP_EXE_RATE)
     {
-        pData->piVoltage.error = pData->piVoltage.reference-pData->vdcAVG.output;
+        pData->piVoltage.error = pData->piVoltage.reference-pData->vdcFeedback;
 
         /* Gain-schedule the integral term with hysteresis: halve Ki for large
            errors, restore full Ki for small errors, and hold the current Ki
@@ -899,7 +989,7 @@ inline static void PFC_CurrentRefGenerate(PFC_T *pData)
         /* else: within the hysteresis band - hold the previous Ki. */
         /* Record the measurement for a self-describing bus; the reference is
          * already set by the soft-start ramp. */
-        pData->piVoltage.input = pData->vdcAVG.output;
+        pData->piVoltage.input = pData->vdcFeedback;
         PFC_ControllerPIUpdate(&pData->piVoltage);
         pData->voltLoopExeRate = 0;
     }

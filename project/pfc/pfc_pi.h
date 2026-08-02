@@ -13,7 +13,7 @@
 /*******************************************************************************
 * SOFTWARE LICENSE AGREEMENT
 * 
-* © [2024] Microchip Technology Inc. and its subsidiaries
+* ï¿½ [2024] Microchip Technology Inc. and its subsidiaries
 * 
 * Subject to your compliance with these terms, you may use this Microchip 
 * software and any derivatives exclusively with Microchip products. 
@@ -80,9 +80,11 @@ typedef struct
 
     float kp;             /* Proportional gain coefficient term */
     float ki;             /* Integral gain coefficient term */
-    float kpScale;        /* Normalizing term for proportional coefficient */
-    float kiScale;        /* Normalizing term for integral coefficient */
-    float minOutput;      /* Minimum output limit */      
+    /* kpScale/kiScale removed 2026-08-02: Q15 normalising shifts from the old
+       fixed-point PI, meaningless in this float implementation. They were never
+       assigned or read, and were only being retained to keep the byte layout
+       compatible with the assembly PI, which has been deleted. */
+    float minOutput;      /* Minimum output limit */
     float maxOutput;      /* Maximum output limit */
 }PFC_PI_T;  
 

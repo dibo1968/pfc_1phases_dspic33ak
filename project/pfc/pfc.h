@@ -69,9 +69,9 @@ typedef struct
 {
     float sum;
     float output;
-    /* Retained for the SiL/X2C bus mirror only. The Vdc window is now set
-       directly from PFC_VDC_AVG_SAMPLES (no longer a power-of-two shift). */
-    uint16_t scaler;
+    /* scaler removed 2026-08-02: the window is set directly from
+       PFC_VDC_AVG_SAMPLES and is no longer a power-of-two shift, so there was
+       nothing for it to hold. Never assigned, never read. */
     uint16_t samples;
     uint16_t sampleLimit;
     uint16_t status;
@@ -83,8 +83,12 @@ typedef struct
     float sum;
     uint16_t samples;
     uint16_t sampleLimit;
-    float peak;
-    float peakcheck;
+    /* peak/peakcheck removed 2026-08-02: peakcheck was never touched at all and
+       peak was only ever assigned 0 in PFC_ResetParams, so a field named "peak"
+       reported a constant zero - worse than absent, since it reads like a real
+       measurement on the scope. The input peak is computed where it is needed,
+       as sqrtf(2*sqrOutput) in PFC_StatePrecharge. If a persistent peak is
+       wanted later, add it back populated (appending is mirror-safe). */
     uint16_t status;
 }PFC_RMS_SQUARE_T;
 
@@ -99,6 +103,30 @@ typedef struct
     float    gain;         /* Feed-forward gain (0..~1), bench-tuned. */
     uint16_t enable;       /* 0 = FF off (default), 1 = on. */
 }PFC_LOAD_FF_T;
+
+/** Vdc conditioning for the voltage-PI feedback path: a single real pole
+ *  (broadband ADC noise) cascaded with a 100 Hz notch (double-line ripple).
+ *  Buys back the phase the 10 ms block average costs, without touching
+ *  KP_V/KI_V - see PFC_VDC_NOTCH_ENABLE_DEFAULT for the rationale and for the
+ *  50 Hz-only caveat. The notch is direct form I, so x1/x2 and y1/y2 are its
+ *  input and output histories. */
+typedef struct
+{
+    float lpfOut;      /* Output of the anti-noise pole = the notch input. */
+    float x1;          /* Notch input  history, z^-1. */
+    float x2;          /* Notch input  history, z^-2. */
+    float y1;          /* Notch output history, z^-1. */
+    float y2;          /* Notch output history, z^-2. */
+    float output;      /* Filtered Vdc [V]. Updated even when enable is 0. */
+    float b0;          /* Notch numerator coefficients, a0-normalised. */
+    float b1;
+    float b2;
+    float a1;          /* Notch denominator coefficients, a0-normalised. */
+    float a2;
+    float lpfCoeff;    /* Anti-noise pole coefficient (0..1). */
+    uint16_t exeRate;  /* ISR counter, decimates the filter to the PI rate. */
+    uint16_t enable;   /* 0 = PI uses vdcAVG.output, 1 = PI uses output. */
+}PFC_VDC_NOTCH_T;
 
 typedef enum
 {
@@ -147,7 +175,8 @@ typedef enum
 typedef struct
 {
     uint32_t duty;
-    uint16_t samplePoint;
+    /* samplePoint removed 2026-08-02: declared but never assigned or read. The
+       ADC trigger position is fixed at PFC_ADC_SAMPLING_POINT in pwm.h. */
     float  averageCurrent;
     uint16_t  rampRate;
     uint16_t  voltLoopExeRate;
@@ -200,6 +229,14 @@ typedef struct
         duty (legacy behaviour). Writable at run time so both can be compared
         on a single build, like sampleCorrectionEnable. */
     uint16_t dutyFFEnable;
+    /** Notch + anti-noise pole on the bus measurement. Appended at the end of
+        PFC_T on purpose: the SiL bus mirror copies field by field and indexes
+        its own layout positionally, so appending leaves it valid. */
+    PFC_VDC_NOTCH_T vdcNotch;
+    /** The bus measurement the voltage PI actually closes on: vdcNotch.output
+        when vdcNotch.enable is set, otherwise vdcAVG.output. Precharge, the
+        OV/UV trips and loadFF keep reading vdcAVG.output directly. */
+    float vdcFeedback;
 }PFC_T;
 
 // </editor-fold> 
