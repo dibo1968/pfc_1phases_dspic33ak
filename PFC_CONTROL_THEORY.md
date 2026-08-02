@@ -30,8 +30,20 @@ Conventions used throughout:
 | `L` | boost inductance, 680 µH | `PFC_INDUCTANCE` |
 | `C` | DC-bus capacitance, 1410 µF | plant only (`C` in the `.m` file) |
 
-Equations are given in plain ASCII inside fenced blocks so they render identically in
-GitHub, VS Code and MPLAB X.
+**Maths rendering.** Equations are written in LaTeX (`$…$` inline, `$$…$$` display). These
+render in **VS Code's built-in Markdown preview** (`Ctrl+Shift+V` — KaTeX, enabled by
+default) and on GitHub. They will **not** render in MPLAB X, which shows the raw source.
+Waveform sketches and block diagrams stay as ASCII art, which is clearer as a drawing and
+readable everywhere.
+
+Display equations are numbered by chapter — `(1.4)` is the fourth in chapter 1 — so later
+sections can refer to them precisely instead of saying "as shown above".
+
+> **Conversion status.** **Chapter 1 is complete** in this style — numbered equations,
+> explicit assumptions, step-by-step derivations, worked numbers for this hardware, and a
+> traps box per section. Chapters 2–20 still use the older terse ASCII form and read as a
+> reference rather than a tutorial. They are being converted incrementally, so expect the
+> style to change at the §1.5 / §2 boundary.
 
 Statements are labelled where they are not directly readable from the source:
 **[derived]** = obtained here from the code/parameters by calculation;
@@ -67,6 +79,14 @@ datasheet; **[open]** = a known gap or caveat.
 
 ### 1.1 Topology and switching states
 
+**The question.** What are the pieces, and what does each switching state do to the
+inductor current? Everything in chapters 1–2 follows from the answer, because a boost
+converter has exactly one actuator — the fraction of each period the switch is closed —
+and its entire behaviour is the consequence of applying two different voltages to one
+inductor.
+
+#### Physical picture
+
 ```
         L            D
   Vg o--UUUU--+-----|>|-----+----o Vo
@@ -77,189 +97,535 @@ datasheet; **[open]** = a known gap or caveat.
   GND o-------+-------------+----o
 ```
 
-In this project `Vg` is not a DC source: it is the *rectified line*, `Vg(t) =
-Vpk·|sin(ω_line t)|`, produced by the input diode bridge. The bus capacitor `C` sits on
-the output, so `Vo` is nearly DC and always larger than `Vg`.
+In this project $V_g$ is **not** a DC source: it is the *rectified line*,
 
-Two states per switching period `Ts`:
+$$V_g(t) = \hat{V}\left|\sin(\omega_{line} t)\right| \tag{1.1}$$
 
-| State | Duration | Inductor voltage | `di/dt` |
-|---|---|---|---|
-| **ON** (Q closed, D blocking) | `d·Ts` | `+Vg` | `+Vg/L` |
-| **OFF** (Q open, D conducting) | `(1−d)·Ts` (CCM) | `Vg − Vo` (negative) | `(Vg−Vo)/L` |
+produced by the input diode bridge. The bus capacitor $C$ sits on the output, so $V_o$ is
+nearly DC and — crucially — always larger than $V_g$.
 
-A third state exists only in DCM: after the inductor current reaches zero the diode stops
-conducting and `i = 0` for the rest of the period (§1.4).
+> **Assumptions.** Carried through all of chapter 1.
+>
+> 1. **Ideal switch and diode.** No forward drop, no on-resistance, no switching time,
+>    no diode reverse recovery. Real drops shift the duty slightly but change nothing
+>    structural.
+> 2. **$V_o$ is stiff within a switching period.** $C$ is large enough that $V_o$ barely
+>    moves in 15.6 µs. It does move at 100 Hz — that is the bus ripple of §2.5 — but
+>    that is slow compared with the switching period.
+> 3. **$V_g$ is quasi-static within a switching period.** $f_{sw}$ is 1280× the line
+>    frequency, so $V_g$ changes by well under 1 % per period.
+
+#### The two states
+
+The switch alternately connects the inductor's right-hand end to ground or to the bus.
+That is the whole mechanism — two different voltages across one inductor:
+
+| State | Duration | Inductor voltage $v_L$ | $di/dt = v_L/L$ | what it does |
+|---|---|---|---|---|
+| **ON** (Q closed, D blocked) | $d\,T_s$ | $+V_g$ | $+V_g/L$ | stores energy in $L$; the load is fed by $C$ alone |
+| **OFF** (Q open, D conducting) | $(1-d)T_s$ in CCM | $V_g - V_o$ (negative) | $(V_g-V_o)/L$ | dumps $L$'s energy *plus* the input into the bus |
+
+A **third** state exists only in DCM: once the inductor current reaches zero the diode
+stops conducting and $i_L = 0$ for the rest of the period (§1.4).
+
+Note the asymmetry that makes a boost a boost: during ON the load is supported entirely by
+the capacitor, and during OFF the inductor delivers current at a voltage *higher* than the
+input. Energy only ever moves input → inductor → bus.
+
+#### Numbers for this hardware
+
+At the line peak ($V_g = 325.3$ V, $V_o = 380$ V, $L = 680\ \mu H$): [derived]
+
+$$\left.\frac{di}{dt}\right|_{ON} = \frac{325.3}{680\mu} = +0.478\ \text{A}/\mu s,
+\qquad
+\left.\frac{di}{dt}\right|_{OFF} = \frac{325.3-380}{680\mu} = -0.081\ \text{A}/\mu s$$
+
+The rise is nearly six times steeper than the fall, which is why the ON time is short and
+the duty is small near the line peak — quantified in §1.2.
+
+> **Traps.**
+>
+> * **The OFF-state inductor voltage is $V_g - V_o$, not $-V_o$.** The input stays
+>   connected throughout; the inductor sees the *difference*. Getting this wrong is the
+>   most common sign error in boost analysis, and it propagates into $d_2$ in §1.4.
+> * **"OFF" does not mean "not conducting".** During OFF the inductor is delivering
+>   current to the load through the diode. It is the ON state in which the bus is
+>   unsupported.
 
 ### 1.2 CCM steady state — volt-second balance and the gain formula
 
-In steady state the average voltage across an inductor over one period is zero
-("volt-second balance"), because the current must return to its starting value:
+**The question.** Given an input $V_g$ and a desired output $V_o$, what duty does the
+converter settle at in steady state? This produces $D_{ideal}$, the single most reused
+quantity in the firmware — it appears in the duty feed-forward (§9), the conduction-mode
+detector (§10) and the sample reconstruction (§11).
+
+#### Physical picture
+
+In steady state the inductor current must end each period exactly where it started —
+otherwise it would drift away period after period, which is not a steady state. Since
+$v_L = L\,di/dt$, "current returns to its starting value" is the same statement as "the
+*area* under the voltage waveform over one period is zero":
 
 ```
-Vg·(d·Ts)  +  (Vg − Vo)·((1−d)·Ts)  =  0
+  v_L
+   |    +Vg
+   |  +------+                        area ABOVE the axis (during ON)
+ 0 |--+------+------------------+---  must equal
+   |         |                  |     area BELOW it (during OFF)
+   |         +------------------+
+   |              Vg - Vo
+      |<-d.Ts->|<---(1-d).Ts--->|
 ```
 
-Expanding and dividing by `Ts`:
+This is **volt-second balance**. It is not an approximation — it is exact for any
+periodic steady state.
 
-```
-Vg·d + Vg − Vg·d − Vo + Vo·d = 0
-Vg = Vo·(1 − d)
-```
+> **Assumptions.** Those of §1.1, plus **CCM** (the current never reaches zero, so there
+> are only two intervals) and **steady state** (this says nothing about transients — during
+> a load step the duty is deliberately *not* $D_{ideal}$).
 
-which gives the two forms used everywhere in this firmware:
+#### Derivation
 
-```
-Boost voltage gain :   M(d) = Vo/Vg = 1/(1 − d)
-Duty for a target  :   d    = (Vo − Vg)/Vo  =  1 − Vg/Vo
-```
+**Step 1 — write the balance.** Voltage $\times$ time for each interval, summed to zero:
 
-The second form is `D_ideal` — the *ideal boost duty ratio*. It is computed once per ISR:
+$$V_g\,(d\,T_s) \;+\; (V_g - V_o)\bigl((1-d)T_s\bigr) = 0 \tag{1.2}$$
 
-> `PFC_UpdateBoostDutyRatio()` — [pfc.c:260](project/pfc/pfc.c:260)
+**Step 2 — divide out $T_s$.** It appears in both terms, so the result cannot depend on
+the switching frequency:
+
+$$V_g\,d + (V_g - V_o)(1-d) = 0$$
+
+**Step 3 — expand the product.**
+
+$$V_g d + V_g - V_g d - V_o + V_o d = 0$$
+
+**Step 4 — cancel.** The $+V_g d$ and $-V_g d$ terms cancel exactly, which is what makes
+the result so simple:
+
+$$V_g - V_o + V_o d = 0 \;\;\Longrightarrow\;\; V_g = V_o(1-d)$$
+
+**Step 5 — read it two ways.** Solving for the ratio gives the voltage gain; solving for
+$d$ gives the duty the converter needs:
+
+$$M(d) = \frac{V_o}{V_g} = \frac{1}{1-d} \tag{1.3a}$$
+
+$$\boxed{\;D_{ideal} = \frac{V_o - V_g}{V_o} = 1 - \frac{V_g}{V_o}\;} \tag{1.3b}$$
+
+#### Numbers for this hardware
+
+$D_{ideal}$ is not a constant — in a PFC it sweeps the *entire* usable range twice per
+line cycle. At 230 Vrms ($\hat V = 325.3$ V) into a 380 V bus: [derived]
+
+| $\theta$ | 0° | 15° | 30° | 45° | 60° | 75° | 90° |
+|---|---|---|---|---|---|---|---|
+| $V_g$ (V) | 0 | 84.2 | 162.6 | 230.0 | 281.7 | 314.2 | 325.3 |
+| $D_{ideal}$ | 1.000 | 0.778 | 0.572 | 0.395 | 0.259 | 0.173 | **0.144** |
+
+and it does that 100 times a second. The steepest slew is at the zero crossing:
+
+$$\left.\frac{dD_{ideal}}{dt}\right|_{\theta=0}
+= \frac{\hat V}{V_o}\,\omega_{line} = 0.856 \times 314.2 = 269\ \mathrm{s^{-1}}
+\;\;\Longrightarrow\;\; 0.42\ \%\ \text{of full duty per switching period}$$
+
+That number is the whole motivation for §9. A PI controller asked to *synthesise* a ramp
+this steep through its integrator will always lag it — a classic velocity error — and the
+lag shows up directly as input-current distortion. Feeding $D_{ideal}$ forward instead,
+and letting the PI trim only the residue, removes the ramp from the integrator's job.
+
+#### In the firmware
+
+Computed once per ISR, straight from the two live measurements:
+
+> `PFC_UpdateBoostDutyRatio()` — [pfc.c:334](project/pfc/pfc.c:334)
 > ```c
 > pfcData->boostDutyRatio = ((pVoltage->vdc - pfcData->rectifiedVac) / pVoltage->vdc);
 > ```
 
-Two consequences that dominate the control design:
+Note it uses **instantaneous** `vdc`, not the averaged bus voltage. That is deliberate: it
+makes the feed-forward cancel bus ripple as well as the line sweep (§9).
 
-* **`M ≥ 1` always.** A boost can only step up. Whenever `Vg > Vo` the converter has no
-  control authority — current flows through `L` and `D` into the bus regardless of `d`.
-  This is exactly what happens during precharge (§13.1).
-* **`d` sweeps the full range every half line cycle.** With `Vpk = 325 V` and `Vo = 380 V`,
-  `D_ideal` goes from `1.0` at the zero crossing down to `0.144` at the line peak and back,
-  100 times a second. Forcing an integrator to synthesise that ramp is the root cause of
-  the current-loop tracking error that the duty feed-forward removes (§9).
+> **Traps.**
+>
+> * **$M \ge 1$ always — a boost cannot step down.** Whenever $V_g > V_o$ the converter
+>   has *no control authority*: current flows through $L$ and $D$ into the bus regardless
+>   of $d$. This is exactly the situation during precharge (§13.1), and it is why
+>   $D_{ideal}$ from (1.3b) goes negative there and has to be guarded (§9.4).
+> * **$D_{ideal}$ is the *steady-state CCM* duty, not "the duty to apply".** In DCM the
+>   converter does not sit at $D_{ideal}$ at all — volt-second balance no longer pins the
+>   duty, and the applied $d_1$ is free (§1.4). The firmware uses $D_{ideal}$ in *both*
+>   modes, but for different purposes: as the duty itself in CCM, and as a known
+>   coefficient inside (1.10) and (1.12) in DCM.
+> * **$D_{ideal} \to 1$ at the zero crossing**, beyond `PFC_MAX_DUTY = 0.95`. The
+>   converter simply cannot follow there; the feed-forward is clamped rather than allowed
+>   to command a duty the PWM would clip anyway (§9.4).
 
 ### 1.3 Inductor current ripple and the CCM/DCM boundary
 
-Peak-to-peak ripple over the ON interval:
+**The question.** Within one switching period the inductor current does not sit still — it
+ramps up while the switch is ON and down while it is OFF. How big is that swing, and when
+does it get large enough that the current reaches zero before the period ends? That second
+question matters enormously, because a converter whose current hits zero obeys completely
+different equations (§1.4) and presents a completely different plant to the controller.
+
+#### Physical picture
 
 ```
-ΔI = (Vg/L)·d·Ts
+  iL                                              iL
+   |      /\      /\      /\                       |   /\          /\
+   |     /  \    /  \    /  \                      |  /  \        /  \
+Iavg|---/----\--/----\--/----\---               Iavg| /    \      /    \
+   |   /      \/      \/      \                     |/      \    /      \
+   |  /                                             |        \  /        \
+  0 +--------------------------- t                 0 +---------\/---------\--- t
+        valley stays above zero                          |<d1>|<d2>|<d3>|
+              (CCM)                                 current sits at zero (DCM)
 ```
 
-Substituting the CCM duty `d = 1 − Vg/Vo`:
+In CCM the current never reaches zero, so the diode conducts for the whole OFF time and
+the switch always turns on into a non-zero current. In DCM the current hits zero partway
+through the OFF time, the diode stops conducting, and the inductor simply idles for the
+rest of the period.
 
+> **Assumptions.** All of §1.3–1.4 rests on these. Every formula below stops being exact
+> when one of them is violated.
+>
+> 1. **Small-ripple / linear-ramp.** $V_g$ and $V_o$ are treated as constant across one
+>    switching period, so the current ramps are straight lines. Valid here because
+>    $f_{sw}=64\ \text{kHz}$ is $1280\times$ the line frequency, so $V_g$ moves by well
+>    under 1 % per period.
+> 2. **Ideal switches.** No forward drops, no switching time, no diode reverse recovery.
+> 3. **Steady state within the period** — the CCM duty is the volt-second-balance value
+>    of §1.2. During a transient the applied duty differs and $\Delta I$ changes with it.
+> 4. **Constant $L$.** Not true for a swinging (gapped, saturating) choke — see §10.4.
+
+#### Derivation
+
+**Step 1 — the ripple comes straight from the inductor law.** During the ON interval the
+full input voltage is across the inductor, so $v_L = V_g$ and $\;di/dt = V_g/L$. Holding
+that for a time $d\,T_s$ gives the peak-to-peak swing:
+
+$$\Delta I = \frac{V_g}{L}\,d\,T_s \tag{1.4}$$
+
+**Step 2 — substitute the steady-state duty.** In CCM, volt-second balance fixes the duty
+at $d = D_{ideal} = 1 - V_g/V_o$ by (1.3b), regardless of load. Putting that into (1.4)
+expresses the ripple purely in terms of the operating point:
+
+$$\Delta I(V_g) = \frac{T_s}{L}\,V_g\left(1 - \frac{V_g}{V_o}\right) \tag{1.5}$$
+
+**Step 3 — find the worst case.** Read (1.5) as a function of $V_g$: it is
+$\frac{T_s}{L}\left(V_g - V_g^2/V_o\right)$, a downward parabola that is zero at $V_g=0$
+and at $V_g=V_o$. By symmetry its maximum is halfway between, at $V_g = V_o/2$.
+Substituting that back:
+
+$$\Delta I_{max} = \frac{T_s}{L}\cdot\frac{V_o}{2}\cdot\frac{1}{2} = \frac{T_s\,V_o}{4L} \tag{1.6}$$
+
+Note what this says physically: ripple is worst *mid-rise* of the rectified sine, not at
+the peak. At the peak the duty is small, so the ON time is short and there is little time
+to build ripple.
+
+**Step 4 — the boundary condition.** The current stays positive for the whole period as
+long as the valley of the triangle, $I_{avg} - \Delta I/2$, stays above zero. So:
+
+$$\boxed{\;\text{CCM}\iff I_{avg} > \frac{\Delta I}{2} = \frac{T_s}{2L}V_g\left(1-\frac{V_g}{V_o}\right)\;} \tag{1.7}$$
+
+#### Numbers for this hardware
+
+With $T_s = 15.625\ \mu s$, $L = 680\ \mu H$, $V_o = 380\ \text{V}$: [derived]
+
+$$\Delta I_{max} = \frac{15.625\times10^{-6}}{680\times10^{-6}}\cdot\frac{380}{4}
+                 = 0.02298 \times 95 = 2.18\ \text{A pk-pk} \quad\text{at } V_g = 190\ \text{V}$$
+
+The boundary (1.7) is a *current* condition, but it is more useful as a *power* one. Over
+a line cycle the PFC forces $I_{avg}(\theta) = \hat{I}\sin\theta$ while
+$V_g(\theta) = \hat{V}\sin\theta$. Substituting both into (1.7), the $\sin\theta$ cancels
+on each side and leaves
+
+$$\hat{I} > \frac{T_s}{2L}\hat{V}\left(1 - \frac{\hat{V}\sin\theta}{V_o}\right)$$
+
+whose right-hand side is *largest as $\sin\theta \to 0$*. So the zero crossings are the
+hardest place to stay in CCM, and at 230 Vrms ($\hat{V} = 325.3$ V):
+
+| condition | requirement | input power |
+|---|---|---|
+| CCM everywhere in the line cycle | $\hat{I} > \frac{T_s}{2L}\hat{V} = 3.74$ A | **above ≈ 608 W** |
+| CCM at the line peak only | $\hat{I} > \frac{T_s}{2L}\hat{V}(1-\hat{V}/V_o) = 0.54$ A | **above ≈ 88 W** |
+
+Between those two figures the converter is in **mixed conduction mode (MCM)**: CCM around
+the line peak, DCM near the zero crossings. §16 maps the crossover angle against load.
+
+#### In the firmware
+
+Both constants are pre-folded so the ISR never divides: [pfc_userparams.h:189](project/pfc/pfc_userparams.h:189)
+
+```c
+#define PFC_TS_OVER_L      (float)(PFC_LOOPTIME_SEC/PFC_INDUCTANCE)      /* 0.02298 A/V */
+#define PFC_TWO_L_OVER_TS  (float)(2.0f*PFC_INDUCTANCE/PFC_LOOPTIME_SEC) /* 87.04 V/A  */
 ```
-ΔI(Vg) = (Ts/L)·Vg·(1 − Vg/Vo)
-```
 
-This is a downward parabola in `Vg`, maximised at `Vg = Vo/2`:
+`PFC_TS_OVER_L` builds the ripple estimate for the mode detector (§10); `PFC_TWO_L_OVER_TS`
+is the $2L/T_s$ that appears in the DCM duty feed-forward (§9).
 
-```
-ΔI_max = (Ts/L)·Vo/4 = (15.625e-6/680e-6)·380/4 = 2.18 A pk-pk    [derived]
-```
-
-The converter stays in **CCM** as long as the average current exceeds half the ripple
-(the valley stays above zero):
-
-```
-CCM  ⟺  I_avg > ΔI/2 = (Ts/(2L))·Vg·(1 − Vg/Vo)
-```
-
-`Ts/L` and `2L/Ts` are pre-folded constants in the firmware:
-
-> [pfc_userparams.h:189](project/pfc/pfc_userparams.h:189)
-> ```c
-> #define PFC_TS_OVER_L      (float)(PFC_LOOPTIME_SEC/PFC_INDUCTANCE)   /* 0.02298 A/V */
-> #define PFC_TWO_L_OVER_TS  (float)(2.0f*PFC_INDUCTANCE/PFC_LOOPTIME_SEC) /* 87.04 V/A */
-> ```
-
-Because a PFC's `I_avg` is *forced* to follow `|sin|` while the boundary current has a
-different shape, a boost PFC is normally in **mixed conduction mode (MCM)**: CCM near the
-line peak, DCM near the zero crossings. §16 maps this for the present hardware.
+> **Traps.**
+>
+> * $\Delta I$ in (1.4) is **peak-to-peak**, not an amplitude. The boundary uses
+>   $\Delta I/2$ for exactly this reason. Dropping the factor 2 is the most common slip
+>   here and it moves the CCM/DCM boundary by a factor of two.
+> * The boundary is **not a fixed load threshold.** It moves across the line cycle, which
+>   is why a PFC is in MCM rather than cleanly one mode — see the table above.
+> * Ripple peaks at $V_g = V_o/2$, *not* at the line peak. If you size the inductor by
+>   looking only at the peak of the sine you will under-size it.
 
 ### 1.4 DCM analysis
 
-In DCM the current starts each period at zero, rises to a peak, falls back to zero before
-the period ends, and then stays there:
+**The question.** Once condition (1.7) fails, what replaces the CCM relations? This single
+section produces the equations behind the duty feed-forward (§9), the conduction-mode
+detector (§10) *and* the current-sample reconstruction (§11) — it is the most reused
+derivation in the document.
+
+#### Physical picture
+
+The period splits into **three** intervals, not two:
 
 ```
-       Ipk  .              d1 = ON,  d2 = diode conduction,  d3 = idle
-           /|\
-          / | \
+       Ipk  .              d1 = ON        (switch conducting, current ramps up)
+           /|\             d2 = OFF-1     (diode conducting, current ramps down)
+          / | \            d3 = OFF-2     (everything off, current sits at zero)
          /  |  \
     ____/   |   \________
      |<d1>|<-d2->|<-d3->|
+                             d1 + d2 + d3 = 1
 ```
 
-Peak and demagnetising time:
+That idle interval $d_3$ is the whole story. In CCM the OFF interval is $1-d_1$ by
+definition; in DCM the *conducting* part of the OFF interval is only $d_2$, and $d_2$ is
+set by the physics, not by the controller.
 
-```
-Ipk = (Vg/L)·d1·Ts
-d2  = Ipk·L / ((Vo − Vg)·Ts) = d1·Vg/(Vo − Vg)
-```
+> **Assumptions.** Everything from §1.3, plus:
+>
+> 5. **The diode blocks cleanly.** Once $i_L$ reaches zero it stays there — no negative
+>    current, no reverse recovery.
+> 6. **No ringing during $d_3$.** Real hardware rings at the $L$–$C_{oss}$ resonance
+>    during the idle interval; the average of that ringing is taken as zero.
+> 7. $d_3 \ge 0$. At exactly $d_3 = 0$ we are at the boundary and both this section and
+>    §1.3 apply — which is the continuity check at the end.
 
-The cycle-average current is the area of the triangle divided by `Ts`:
+#### Derivation
 
-```
-I_avg = (1/2)·Ipk·(d1 + d2)
-      = (1/2)·(Vg·d1·Ts/L)·d1·(1 + Vg/(Vo − Vg))
-      = (Ts·Vg·d1²)/(2L)·(Vo/(Vo − Vg))
-```
+**Step 1 — the peak.** Identical to (1.4), but starting from zero rather than from a
+valley, so the peak *is* the whole ramp:
 
-Recognising `Vo/(Vo−Vg) = 1/D_ideal`:
+$$I_{pk} = \frac{V_g}{L}\,d_1 T_s \tag{1.8}$$
 
-```
-        I_avg = (Ts · Vg · d1²) / (2 · L · D_ideal)                       (DCM)
-```
+**Step 2 — how long demagnetising takes.** During $d_2$ the inductor sees $V_g - V_o$,
+i.e. it discharges at a rate $(V_o - V_g)/L$. The time to fall from $I_{pk}$ back to zero
+must satisfy
 
-This single expression is the basis for **both** the DCM duty feed-forward (§9) and the
-DCM sample reconstruction (§11). Note what it says: in DCM the average current is a
-*static function of the duty* — unlike CCM, where volt-second balance pins `d` to
-`D_ideal` and the current is free. The two plants are fundamentally different, which is
-why the firmware needs to know which one it is in.
+$$I_{pk} = \frac{V_o - V_g}{L}\,d_2 T_s
+\;\;\Longrightarrow\;\;
+d_2 = \frac{I_{pk}L}{(V_o-V_g)T_s}$$
 
-Two useful identities that fall out:
+Substituting $I_{pk}$ from (1.8), the $L$ and $T_s$ cancel:
 
-```
-(d1 + d2) = d1/D_ideal                     ← the reconstruction factor, §11
-d1 = sqrt( (2L/Ts) · I_avg · D_ideal / Vg ) ← the DCM feed-forward, §9
-```
+$$d_2 = d_1\,\frac{V_g}{V_o - V_g} \tag{1.9}$$
 
-Substituting `d1 = D_ideal` into the DCM `I_avg` gives `I_avg = (Ts·Vg/2L)·(1 − Vg/Vo) =
-ΔI/2` — exactly the CCM boundary of §1.3. **The DCM and CCM expressions meet
-continuously at the boundary.** [derived] That is what makes the composite feed-forward of
-§9 bumpless.
+Sanity check: a bigger $V_o$ means a steeper discharge, so $d_2$ shrinks — as it should.
+
+**Step 3 — average the triangle.** The current is a single triangle of height $I_{pk}$
+and base $(d_1 + d_2)T_s$, sitting in a period of length $T_s$. Its area divided by $T_s$
+is the cycle average:
+
+$$I_{avg} = \frac{1}{2}I_{pk}(d_1 + d_2)$$
+
+Substituting (1.8) and (1.9):
+
+$$I_{avg} = \frac{1}{2}\left(\frac{V_g d_1 T_s}{L}\right)d_1\left(1 + \frac{V_g}{V_o-V_g}\right)$$
+
+**Step 4 — simplify the bracket.** This is the step worth doing slowly. Put the bracket
+over a common denominator:
+
+$$1 + \frac{V_g}{V_o - V_g}
+= \frac{(V_o - V_g) + V_g}{V_o - V_g}
+= \frac{V_o}{V_o - V_g}$$
+
+so that
+
+$$I_{avg} = \frac{T_s V_g d_1^{\,2}}{2L}\cdot\frac{V_o}{V_o - V_g}$$
+
+**Step 5 — recognise the ideal duty.** By (1.3b), $D_{ideal} = (V_o - V_g)/V_o$ — which is
+exactly the reciprocal of that last fraction. Therefore:
+
+$$\boxed{\;I_{avg} = \frac{T_s\,V_g\,d_1^{\,2}}{2\,L\,D_{ideal}}\;}\tag{1.10}$$
+
+#### Why (1.10) matters so much
+
+Compare the two modes as *plants seen by the current controller*:
+
+| | CCM | DCM |
+|---|---|---|
+| what fixes the duty | volt-second balance pins $d = D_{ideal}$ | nothing — $d_1$ is free |
+| relation to current | current is independent of $d$ in steady state | $I_{avg} \propto d_1^{\,2}$, a **static** function |
+| controller sees | an integrator, $V_o/(sL)$ | a square-law gain, no state |
+
+These are fundamentally different plants. A single fixed controller cannot be right for
+both, which is precisely why the firmware detects the mode (§10) and switches its
+feed-forward branch (§9).
+
+#### Two identities that fall straight out
+
+Rearranging (1.9) with the same $V_o/(V_o-V_g) = 1/D_{ideal}$ substitution:
+
+$$d_1 + d_2 = d_1\left(1 + \frac{V_g}{V_o-V_g}\right) = \frac{d_1}{D_{ideal}}
+\tag{1.11}$$
+
+and solving (1.10) for $d_1$:
+
+$$d_1 = \sqrt{\frac{2L}{T_s}\cdot\frac{I_{avg}\,D_{ideal}}{V_g}} \tag{1.12}$$
+
+(1.11) is the **conduction fraction** used to reconstruct an average from a single sample
+(§11); (1.12) is the **DCM duty feed-forward** (§9). Both are just (1.10) rearranged.
+
+#### The continuity check
+
+Does (1.10) agree with §1.3 at the boundary? At the boundary $d_3 = 0$, and the converter
+is simultaneously "just barely CCM", so $d_1 = D_{ideal}$. Substituting that into (1.10):
+
+$$I_{avg} = \frac{T_s V_g D_{ideal}^{\,2}}{2L\,D_{ideal}}
+          = \frac{T_s V_g D_{ideal}}{2L}
+          = \frac{T_s}{2L}V_g\left(1 - \frac{V_g}{V_o}\right)$$
+
+which is exactly $\Delta I/2$ from (1.7). **The two modes meet continuously.** [derived]
+
+This is not a curiosity — it is what makes the composite feed-forward of §9 bumpless. If
+the two branches did not agree at the boundary, every mode transition would step the duty
+and the mode detector's inevitable chatter would become visible distortion.
+
+#### Numbers for this hardware
+
+Take $V_g = 100$ V (well down the sine, where DCM lives) and a commanded $d_1 = 0.20$:
+
+$$D_{ideal} = \frac{380-100}{380} = 0.7368,\qquad
+I_{pk} = \frac{100}{680\mu}\cdot0.2\cdot15.625\mu = 0.460\ \text{A}$$
+
+$$d_2 = 0.2\cdot\frac{100}{280} = 0.0714,\qquad d_1 + d_2 = 0.271\;(\text{so } d_3 = 0.729)$$
+
+$$I_{avg} = \tfrac12 \cdot 0.460 \cdot 0.271 = 0.0624\ \text{A}
+\qquad\text{and via (1.10)}\qquad
+\frac{15.625\mu\cdot100\cdot0.04}{2\cdot680\mu\cdot0.7368} = 0.0624\ \text{A}\;\checkmark$$
+
+Cross-check against the boundary (1.7) at this $V_g$: $\Delta I/2 = 0.85$ A, and
+$0.0624 \ll 0.85$ — deeply into DCM, as expected. Note also that (1.11) gives
+$d_1/D_{ideal} = 0.2/0.7368 = 0.271$, matching $d_1+d_2$ directly.
+
+> **Traps.**
+>
+> * **$d_2 \ne 1 - d_1$.** There is a third interval. Assuming the OFF time is all
+>   diode conduction is the classic DCM error — and it is exactly what the CCM formulas
+>   silently assume, which is why applying them in DCM fails.
+> * **The mid-ON sample is $I_{pk}/2$, not $I_{avg}$.** In DCM those differ by the factor
+>   $(d_1+d_2)$ of (1.11), so a sample taken mid-ON over-reads the true average by
+>   $1/(d_1+d_2)$. That single fact is the entire subject of §11.
+> * **(1.10) is quadratic in $d_1$.** The small-signal gain of the DCM plant therefore
+>   depends on the operating point, doubling as $d_1$ doubles. A controller tuned at one
+>   DCM operating point is not tuned at another.
 
 ### 1.5 Averaged small-signal model
 
-Averaging over `Ts` and perturbing about an operating point gives, for the boost in CCM,
-the control-to-inductor-current transfer function used to tune the current loop:
+**The question.** §1.2–1.4 describe steady state. To *tune* a controller we need to know
+how the converter responds to a small change in duty — that is, a transfer function. This
+section produces the two plants that every gain in §15 is derived from.
 
-```
-G_id(s) = iL_hat(s)/d_hat(s) ≈ Vo/(s·L)
-```
+> **Assumptions.**
+>
+> 1. **Averaging.** Switching detail is discarded and only the cycle-average is modelled.
+>    Valid only well below the switching frequency — as a rule of thumb below
+>    $f_{sw}/5$ to $f_{sw}/10$. Both loops here sit far below that.
+> 2. **Small signal.** Perturbations are small enough about the operating point that
+>    products of perturbations can be dropped. This is what makes the model linear.
+> 3. **CCM** for the current-loop plant. The DCM plant is (1.10) and is different.
 
-(The exact expression has a pole at the load-damped `L–C` resonance; at the current-loop
-crossover — kilohertz — the `Vo/(sL)` approximation is accurate, because the bus behaves
-as a stiff voltage source at those frequencies.) This is the model in the plant script:
+#### The inner plant: duty to inductor current
 
-> [SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:93](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:93)
+Averaging the inductor law over a period and perturbing about an operating point gives,
+for a CCM boost:
+
+$$G_{id}(s) = \frac{\hat{i}_L(s)}{\hat{d}(s)} \approx \frac{V_o}{sL} \tag{1.13}$$
+
+The intuition is direct: nudging the duty by $\hat d$ changes the average voltage applied
+to the inductor by $V_o\hat d$, and an inductor integrates applied voltage into current.
+Hence a pure integrator with gain $V_o/L$.
+
+The exact expression also has a pole pair at the load-damped $L$–$C$ resonance, but the
+current loop crosses over in the kilohertz — far above it — where the bus capacitor makes
+$V_o$ look like a stiff voltage source. That is why (1.13) is accurate where it is used.
+
+> [SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:109](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:109)
 > ```matlab
 > Gid = Vout/(s*L);
 > ```
 
-The **control-to-output-voltage** transfer function of a boost has a **right-half-plane
-zero** at `ω_RHPZ = R·(1−D)²/L`. That is the classic reason a boost cannot have a fast
-voltage loop. In a PFC it barely matters, because the voltage loop must already be slowed
-to well below 100 Hz for a completely different reason (§2.4) — but it is the reason the
-*current* loop is closed on the inductor current rather than the output voltage.
+#### Why the inner loop controls current, not voltage
 
-For the outer loop the relevant model is the **power balance** on the bus capacitor:
+The **control-to-output-voltage** transfer function of a boost contains a **right-half-plane
+zero**:
 
-```
-C·Vo·dVo/dt = Pin − Pout          (energy balance, d/dt(½C·Vo²) = Pin − Pout)
-```
+$$\omega_{RHPZ} = \frac{R\,(1-D)^2}{L} \tag{1.14}$$
 
-Linearising about `Vo`:
+An RHP zero adds phase *lag* while adding gain — the pathological combination for feedback
+— and it hard-limits achievable bandwidth. Physically it is the boost's "wrong-way" step
+response: increase the duty to raise the output and the output initially *falls*, because
+the diode is disconnected for longer before the extra inductor energy can arrive.
 
-```
-vo_hat(s)/p_hat(s) = 1/(s·C·Vo)
-```
+At the line peak and full load, $R = V_o^2/P_o = 96.3\ \Omega$ and $D = 0.144$: [derived]
 
-§15 compares this against the expression used to derive the shipped gains.
+$$\omega_{RHPZ} = \frac{96.3\times(0.856)^2}{680\times10^{-6}} \approx 1.04\times10^{5}\ \text{rad/s}
+\;\;\Rightarrow\;\; \approx 16.5\ \text{kHz}$$
+
+comfortably above the 3.2 kHz current-loop crossover (§15.2). But note that $(1-D)^2$
+collapses as $V_g \to 0$, dragging the RHP zero toward DC near the zero crossings.
+
+**The resolution:** $G_{id}$ in (1.13) has **no** RHP zero — it is minimum-phase. Closing
+the fast loop on *inductor current* rather than output voltage sidesteps the problem
+entirely, and the slow outer loop never gets near the RHP zero anyway. This is the
+structural reason for average current mode control (§2.3), not merely a convention.
+
+#### The outer plant: power command to bus voltage
+
+The bus capacitor is an *energy* store, so start from energy rather than voltage. The
+capacitor stores $E = \tfrac12 C V_o^2$, and its rate of change is the power imbalance:
+
+$$\frac{d}{dt}\left(\tfrac12 C V_o^2\right) = P_{in} - P_{out}$$
+
+Differentiating the left side ($\tfrac12 C \cdot 2V_o \dot V_o$) gives
+
+$$C\,V_o\,\frac{dV_o}{dt} = P_{in} - P_{out} \tag{1.15}$$
+
+Now linearise: write $V_o \to V_o + \hat v_o$ and $P_{in}-P_{out} \to \hat p$, and drop
+the product of perturbations. The coefficient $CV_o$ is evaluated at the operating point,
+so in the Laplace domain $C V_o \, s\, \hat v_o = \hat p$, giving
+
+$$\boxed{\;\frac{\hat v_o(s)}{\hat p(s)} = \frac{1}{s\,C\,V_o}\;} \tag{1.16}$$
+
+Another pure integrator — which is why the outer loop is a PI on an integrator, and why
+its phase margin is so sensitive to any extra delay in the feedback path (§4.5).
+
+For this hardware, $C = 1410\ \mu F$ and $V_o = 380$ V: [derived]
+
+$$\frac{1}{C V_o} = \frac{1}{1410\times10^{-6}\times380} = \frac{1}{0.5358} = 1.866\ \mathrm{s^{-1}}$$
+
+> **Traps.**
+>
+> * **(1.16) is where a real bug lived.** The design script used $2/(sCV_o)$ — twice the
+>   correct value. The factor 2 is right for the *squared-voltage* form
+>   $\hat{V_o^2}/\hat p = 2/(sC)$, but converting that back to $V_o$ requires dividing by
+>   $2V_o$, not $V_o$. The consequence was a documented 12 Hz crossover against a real one
+>   of 6.9 Hz. Fixed; see §15.4.
+> * **$\hat p$ is in watts, not volts or duty.** (1.16) is only valid because the
+>   multiplier (§6) makes the voltage-PI output a genuine power command.
+> * **Both plants are integrators**, so both loops have $-90°$ of phase before the
+>   compensator does anything. All the phase margin has to come from the PI zero, minus
+>   whatever the feedback filtering and computational delay take back.
+
+§15 derives the actual gains from (1.13) and (1.16).
 
 ---
 
@@ -345,9 +711,9 @@ power. If the voltage loop responded to that ripple it would modulate `P_command
 100 Hz, and the multiplier would fold that into the current reference as **third-harmonic
 distortion**. Hence:
 
-* voltage-loop crossover designed at **12 Hz** ([data file:84](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:84)),
+* voltage-loop crossover designed at **12 Hz** ([data file:99](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:99)),
   though the script's plant carries a factor-2 error and the loop actually crosses at
-  **6.9 Hz** (§15.3);
+  **6.9 Hz** (§15.4);
 * the bus feedback is averaged over exactly one 100 Hz ripple period, so the ripple is
   *structurally* nulled before it reaches the PI (§4.5);
 * and a 100 Hz notch does the same job for far less phase lag, which is what keeps the
@@ -597,13 +963,13 @@ Two properties of this filter that matter for stability (both **[derived]**):
   ```
 
   A 10 ms window costs **10 ms of delay, not 5** — the hold is as expensive as the average.
-  That is ~25° of phase lag at the real 6.90 Hz crossover (§15.3).
+  That is ~25° of phase lag at the real 6.90 Hz crossover (§15.4).
 * The same holds for `vacRMS.sqrOutput`: the multiplier's `1/Vrms²` term can be up to one
   half-cycle stale after a line step (review §2.2, still open).
 
 Both were made 5× longer than the original 128-sample window when the ripple-nulling fix
 landed. That re-verification has now been done (2026-08-02, **[derived]**), against the
-corrected plant of §15.3:
+corrected plant of §15.4:
 
 | Vdc feedback path | τ | fc | PM | GM |
 |---|---|---|---|---|
@@ -1384,7 +1750,249 @@ All four gains trace back to the plant design script
 The firmware constants are the **discrete-time** versions: because the PI integrates as
 `integralOut += ki·error` once per execution, `ki_firmware = Ki_continuous × T_exec`.
 
-### 15.1 Current loop
+§15.1 is a primer on what the margin numbers quoted throughout this document actually
+mean; §15.2–15.4 apply it to the two loops.
+
+### 15.1 Stability margins: what the numbers mean
+
+**The question.** This document quotes "PM 33.8°", "PM 54.1°", "GM 12.4 dB" as though the
+difference obviously matters. What is being measured, why is 45–60° the target rather than
+"as much as possible", and why does a 10 ms averaging window destroy 20° of it while a
+notch with the same rejection costs 5°?
+
+#### The loop gain and the −1 point
+
+Break the feedback loop anywhere and multiply everything you pass through on the way
+round. For a controller $C$, plant $P$ and feedback path $H$:
+
+$$L(s) = C(s)\,P(s)\,H(s) \tag{15.1}$$
+
+Closing the loop gives the reference-to-output and disturbance-to-output transfers
+
+$$T(s) = \frac{L}{1+L} \qquad\text{(complementary sensitivity)} \tag{15.2}$$
+
+$$S(s) = \frac{1}{1+L} \qquad\text{(sensitivity)} \tag{15.3}$$
+
+Both blow up wherever $1 + L(j\omega) = 0$, i.e. $L(j\omega) = -1$. That single complex
+point is the whole subject.
+
+Why $-1$ specifically? $|L| = 1$ means a disturbance returns after one trip round the loop
+with **unchanged amplitude**. $\angle L = -180°$ means it returns **inverted**; the summing
+junction subtracts it, inverting it again, so it arrives back in phase with itself. A
+signal that reproduces itself exactly, forever, with no input — that is oscillation. Get
+there with $|L| > 1$ and it grows instead.
+
+So stability is a question of **how close the curve $L(j\omega)$ passes to $-1$**, and the
+"margins" are two different ways of measuring that distance.
+
+> **Assumptions.** Everything here is **linear, time-invariant, single-loop** analysis of
+> one operating point:
+>
+> 1. **Linearity.** The plant is the small-signal model of §1.5. Saturation, clamping and
+>    anti-windup are all outside this framework.
+> 2. **One loop at a time.** The current loop is assumed infinitely fast when analysing
+>    the voltage loop. Fair here — 3.2 kHz against 6.9 Hz — but it is an assumption.
+> 3. **Fixed gains.** The gain scheduling of §5.2 makes the system non-linear; margins are
+>    evaluated at the small-error gain, which is where it sits in steady state.
+> 4. **One operating point.** In DCM the plant gain depends on duty (§1.4), so margins
+>    move with load. The quoted figures are for the CCM/nominal case.
+
+#### The two margins
+
+Both are distances from $-1$, measured along two different axes.
+
+**Gain margin** — how much extra gain would push you to $-1$, measured at the frequency
+where the phase has already reached $-180°$:
+
+$$\text{GM} = \frac{1}{|L(j\omega_{180})|}, \qquad \angle L(j\omega_{180}) = -180° \tag{15.4}$$
+
+**Phase margin** — how much extra *phase lag* would push you to $-1$, measured at the
+frequency where the gain has already reached 1:
+
+$$\text{PM} = 180° + \angle L(j\omega_c), \qquad |L(j\omega_c)| = 1 \tag{15.5}$$
+
+$\omega_c$ is the **gain crossover** — the loop's bandwidth in all but name, and the
+frequency at which almost everything in §15.2–15.4 is evaluated.
+
+#### Why margins can still lie: the sensitivity peak
+
+GM and PM each probe the $-1$ point along one axis only. A Nyquist curve can keep a
+respectable distance on both axes and still pass close to $-1$ diagonally. The honest
+measure is the **shortest** distance, which is exactly the peak of the sensitivity
+function:
+
+$$M_s = \max_\omega\left|S(j\omega)\right| = \max_\omega\frac{1}{|1+L(j\omega)|},
+\qquad \text{vector margin} = \frac{1}{M_s} \tag{15.6}$$
+
+$M_s$ has a direct physical meaning that PM does not: **it is the worst-case amplification
+of a disturbance** anywhere in frequency. $M_s = 2$ means some disturbance frequency is
+made twice as bad by the feedback. Good designs target $M_s \le 2$, often $\le 1.7$.
+
+The chord from $-1$ to the unit circle at angle PM has length $2\sin(\text{PM}/2)$, and the
+true distance cannot exceed it, which gives a one-way bound:
+
+$$M_s \;\ge\; \frac{1}{2\sin(\text{PM}/2)} \tag{15.7}$$
+
+| PM | implied $M_s \ge$ | meaning |
+|---|---|---|
+| 30° | 1.93 (+5.7 dB) | some disturbance amplified ~2× |
+| **33.8°** | **1.72 (+4.7 dB)** | the voltage loop on the block average alone |
+| 45° | 1.31 (+2.3 dB) | |
+| **54.1°** | **1.10 (+0.8 dB)** | the voltage loop with the notch (§4.6) |
+| ≥ 60° | bound is vacuous | $M_s \ge 1$ always, so PM stops being informative |
+
+This is the sharpest statement of what the notch bought: not merely "more margin", but a
+loop that no longer amplifies any disturbance frequency by more than ~10 %.
+
+#### What phase margin buys in the time domain
+
+Approximate the loop near crossover by a canonical second-order system. Then PM maps
+one-to-one onto damping ratio $\zeta$, and $\zeta$ onto the overshoot of a **reference
+step**:
+
+$$M_p = \exp\!\left(\frac{-\pi\zeta}{\sqrt{1-\zeta^2}}\right) \tag{15.8}$$
+
+| $\zeta$ | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 |
+|---|---|---|---|---|---|
+| PM (exact) | 33.3° | 43.1° | 51.8° | 59.2° | 65.2° |
+| overshoot | 37 % | 25 % | 16 % | 9.5 % | 4.6 % |
+
+which is where the familiar rule of thumb $\zeta \approx \text{PM}/100$ comes from — good
+to about a percent over this whole range.
+
+**Why 45–60° and not more.** Below ~45° the response rings and $M_s$ climbs past 1.3.
+Above ~65° you are paying for damping you cannot use: the closed loop becomes sluggish,
+and since crossover must fall to buy that phase, you give up bandwidth and disturbance
+rejection at every frequency below it. 45–60° is the knee of that trade — plus enough
+slack that component tolerance, a swinging inductor (§10.4) or an ageing bus capacitor
+cannot eat the whole margin.
+
+#### Delay: the margin killer
+
+A pure delay $\tau$ has the transfer function $e^{-s\tau}$, so
+
+$$\left|e^{-j\omega\tau}\right| = 1, \qquad \angle e^{-j\omega\tau} = -\omega\tau
+\;\;\text{rad} = -360\,f\,\tau \;\text{degrees} \tag{15.9}$$
+
+Read those two facts together and you have the reason delay is uniquely dangerous: it
+costs **phase without costing any gain**. A Bode magnitude plot shows nothing at all. And
+the phase cost grows *linearly* with frequency, so the faster you make a loop the more it
+hurts — a delay you could ignore at 1 Hz is fatal at 100 Hz.
+
+This is also why the averaging filter of §4.5 was so expensive. A moving average over a
+window $T_w$ has
+
+$$H(j\omega) = \frac{1}{T_w}\int_0^{T_w}\!\! e^{-j\omega t}\,dt
+ = e^{-j\omega T_w/2}\,\mathrm{sinc}\!\left(\frac{\omega T_w}{2}\right) \tag{15.10}$$
+
+— a magnitude term *and* a linear phase term $-\omega T_w/2$, i.e. an effective delay of
+**half the window**. Sampling the result and holding it for $T_h$ adds another
+$-\omega T_h/2$. Hence the total in §4.5:
+$\tau = (T_w + T_h + T_{sv})/2$, and hence why a block average costs twice what an
+equivalent sliding average would.
+
+A notch, by contrast, is *not* a delay. It is selective: it can put a deep null at 100 Hz
+while contributing only a few degrees at 7 Hz, because it does not have to attenuate
+everything in between. That asymmetry — 25° versus 4.6° for the same 100 Hz rejection —
+is the entire argument of §4.6.
+
+#### The closed form for this converter
+
+Both plants in §1.5 are pure integrators, so the loop gain of either PI loop is
+
+$$L(s) = \underbrace{\left(K_p + \frac{K_i}{s}\right)}_{\text{PI}}
+        \cdot \underbrace{\frac{K}{s}}_{\text{plant}}
+        \cdot \underbrace{e^{-s\tau}}_{\text{feedback delay}}$$
+
+Take the phase of each factor at $\omega_c$. The plant integrator contributes a flat
+$-90°$. The PI can be written $K_p(s+\omega_z)/s$ with $\omega_z = K_i/K_p$, giving
+$-90° + \arctan(\omega_c/\omega_z)$. The delay contributes $-\omega_c\tau$ by (15.9).
+Summing and substituting into (15.5), the two $-90°$ terms make exactly the $-180°$ that
+PM is measured from, and they cancel:
+
+$$\boxed{\;\text{PM} = \arctan\!\left(\frac{f_c}{f_z}\right) - 360\,f_c\,\tau\;} \tag{15.11}$$
+
+Two terms, and they are in direct competition. **All** the phase margin comes from placing
+the PI zero below crossover; **all** of it is spent on delay. There is nothing else in the
+loop to help. This is the formula quoted in §4.5, and it matches a full numerical Bode
+calculation on these loops to within 0.1°.
+
+It also explains a result that looks wrong at first: leaving `KI_V` scaled for the old
+10-tick rate (§15.3) *lowers* $f_z$ from 5 Hz to 4.167 Hz, which **increases**
+$\arctan(f_c/f_z)$ — so the "bug" is worth about 4° of margin and must not be corrected.
+
+#### From continuous design to firmware constants
+
+The design above is continuous; the firmware is discrete. Three separate effects.
+
+**1. The integrator becomes a running sum.** The firmware executes
+
+> [pfc_pi.c:72](project/pfc/pfc_pi.c:72)
+> ```c
+> pPIParam->integralOut = pPIParam->integralOut + pPIParam->ki * pPIParam->error;
+> ```
+
+which is $I[k] = I[k-1] + k_i\,e[k]$ — **backward Euler** (the current error, not the
+previous one). Backward Euler substitutes $s \to (1-z^{-1})/T$, so $K_i/s$ maps to
+$K_i T/(1-z^{-1})$, and therefore
+
+$$k_{i,\text{firmware}} = K_{i,\text{continuous}} \times T_{exec} \tag{15.12}$$
+
+$K_p$ needs no such conversion — the proportional path has no memory. **This is why
+`KI_V` and `VOLTAGE_LOOP_EXE_RATE` are coupled and `KP_V` is not.**
+
+**2. Sample-and-hold costs half a period.** A value held constant for $T$ is on average
+$T/2$ stale — the ZOH term already seen in (15.10).
+
+**3. Computation and actuation cost about one more.** The ADC samples mid-ON, the ISR
+computes, and the resulting duty is written to a register that takes effect at the next
+period boundary.
+
+Together, roughly $1.5\,T_s$ of delay in the current loop, which by (15.9) costs
+
+$$360 \times 6400 \times 1.5 \times 15.625\,\mu s = 54° \quad\text{at the 6.4 kHz design crossover}$$
+
+but only **27°** at the 3.2 kHz the gains actually ship at. That single number is the
+justification for halving `KP_I`/`KI_I` (§15.2) — the continuous design simply did not
+account for it.
+
+#### Numbers for this hardware
+
+Applying (15.11) to the voltage loop, whose PI zero sits at $f_z = 4.167$ Hz. Each
+configuration crosses over at a slightly different $f_c$, so the lead term moves a little
+too: [derived]
+
+| feedback path | $f_c$ | $\tau$ | lead $\arctan(f_c/f_z)$ | phase cost | PM |
+|---|---|---|---|---|---|
+| 2 ms block average (old) | 6.98 Hz | 2.09 ms | +59.2° | −5.3° | **53.9°** |
+| 10 ms block average | 6.90 Hz | 10.09 ms | +58.9° | **−25.1°** | **33.8°** |
+| 10 ms + notch (§4.6) | 6.97 Hz | — | +59.1° | −5.0° † | **54.1°** |
+
+† the notch is not a delay, so the $360 f_c\tau$ term does not apply; this figure is read
+directly off the filter's phase response near crossover.
+
+Every PM in that table agrees with a full numerical Bode calculation to 0.1°. Note how
+little the lead term moves — 59.2° to 58.9° — while the phase cost swings by 20°. In this
+loop the margin is decided almost entirely by what the feedback path does to phase, which
+is why the fix in §4.6 was a filter change and not a gain change.
+
+> **Traps.**
+>
+> * **Margins are a linear, single-frequency, single-loop measure.** They say nothing
+>   about saturation, anti-windup, or the burst-mode discontinuity of §12 — all of which
+>   have caused real oscillations in this project that no margin figure predicted.
+> * **The overshoot table is for a *reference* step.** The load-step figures quoted in
+>   §4.6 are *disturbance* responses, which have a different shape; do not compare the
+>   percentages directly. What does carry over is the qualitative signature — the 13
+>   ringing crossings at PM 33.8° versus 4 at 54° is exactly what low damping looks like.
+> * **Gain margin alone is not reassuring.** A loop can have 12 dB of GM and still sit
+>   close to $-1$ diagonally. If in doubt, check $M_s$ via (15.6) rather than either
+>   margin.
+> * **These are nominal-plant numbers.** The DCM plant gain scales with duty (§1.4) and
+>   $L$ falls if the choke saturates (§10.4). Both move $f_c$, and (15.11) says PM moves
+>   with it.
+
+### 15.2 Current loop
 
 ```
 Plant           G_id = Vo/(sL)
@@ -1412,7 +2020,7 @@ zero a factor 5 below crossover contributing +79°, the phase margin works out a
 30° at the original gains versus ~52° at the shipped ones. The halving buys back the
 margin the continuous-time design ignored.
 
-### 15.2 Voltage loop
+### 15.3 Voltage loop
 
 ```
 Plant used in the script   Gvc = 2·Kmul/(Kvin·KiL·C·Vo·s)
@@ -1425,7 +2033,7 @@ KI_V = Ki_v·Tsv                                      = ?
 
 `KI_V = 0.0992` implies `Tsv = 0.0992/634.6 = 156.3 µs = 10/64 kHz` — i.e. the constant was
 derived with the voltage loop executing **every 10 ISRs** (`Osr = 10` in the script,
-[data file:69](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:69)).
+[data file:37](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:37)).
 
 **The firmware runs it every 12** (`VOLTAGE_LOOP_EXE_RATE = 12`, `Tsv = 187.5 µs`). [derived]
 
@@ -1440,7 +2048,7 @@ would *reduce* the margin. What it does mean is that **`KI_V` and `VOLTAGE_LOOP_
 coupled** — changing the divisor without rescaling `KI_V` changes the loop. The header
 already warns about this ([pfc_userparams.h:328](project/pfc/pfc_userparams.h:328)).
 
-### 15.3 Two corrections to the voltage-loop design
+### 15.4 Two corrections to the voltage-loop design
 
 Both were flagged as open in earlier revisions of this document. **Confirmed numerically
 2026-08-02** — the 12 Hz figure in the script is not what the hardware runs.
@@ -1651,7 +2259,7 @@ The most informative variables for the control work in this document:
 | Constant | Value | Meaning |
 |---|---|---|
 | `KP_I` / `KI_I` | 0.036 / 0.0022607 | current PI (half the 6.4 kHz design → ~3.2 kHz) |
-| `KP_V` / `KI_V` | 20.199 / 0.0992 | voltage PI (W/V; discrete `ki` assumes `Tsv = 10/fsw`) — real fc 6.9 Hz, PM 54° with the notch (§15.3) |
+| `KP_V` / `KI_V` | 20.199 / 0.0992 | voltage PI (W/V; discrete `ki` assumes `Tsv = 10/fsw`) — real fc 6.9 Hz, PM 54° with the notch (§15.4) |
 | `VOLTAGE_LOOP_EXE_RATE` | 12 | voltage PI every 12 ISRs → 5.33 kHz |
 | `PFC_VOLTAGE_ERR_GAIN_HI/LO` | 12 V / 8 V | gain-scheduling hysteresis band |
 | `PI_V_OUT_MAX` | 1500 | power-command clamp, watts |
@@ -1696,8 +2304,8 @@ list including style and maintainability.
 |---|---|---|---|
 | 1 | `PFC_LOAD_CURRENT_SCALE` is a placeholder copy of the inductor scale | load feed-forward will be mis-scaled on hardware; set `enable = 0` until measured | §7.3 |
 | 2 | Mid-ON sampling not yet confirmed on a scope | every DCM result in §10–§11 assumes it | §3.2 |
-| 3 | `KI_V` derived for `Tsv = 10/fsw`, code runs 12 | integral zero ~17 % low; the two constants are coupled. **Beneficial — do not "fix"** | §15.2 |
-| 4 | ~~Voltage-loop plant carries a factor 2~~ | **Confirmed 2026-08-02**: real crossover is 6.90 Hz, not 12 Hz. Plant validated against the §2.5 ripple formula | §15.3 |
+| 3 | `KI_V` derived for `Tsv = 10/fsw`, code runs 12 | integral zero ~17 % low; the two constants are coupled. **Beneficial — do not "fix"** | §15.3 |
+| 4 | ~~Voltage-loop plant carries a factor 2~~ | **Confirmed 2026-08-02**: real crossover is 6.90 Hz, not 12 Hz. Plant validated against the §2.5 ripple formula | §15.4 |
 | 5 | ~~`KP_V`/`KI_V` never re-verified after 128 → 640 samples~~ | **Done 2026-08-02**: the window cost ~20° of PM (54° → 34°). Gains kept; margin recovered by the §4.6 notch (→ 54°) | §4.5 |
 | 5a | The §4.6 notch is tuned for a 50 Hz line only | −10 dB at 120 Hz vs the boxcar's −32 dB; **inadequate on 60 Hz mains** — retune `f0` or set `vdcNotch.enable = 0` | §4.6 |
 | 6 | `1/Vrms²` and `Vdc_avg` update once per window and hold | up to one half-cycle of lag after a line step | §4.5, review §2.2 |
