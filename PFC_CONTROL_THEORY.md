@@ -39,11 +39,11 @@ readable everywhere.
 Display equations are numbered by chapter — `(1.4)` is the fourth in chapter 1 — so later
 sections can refer to them precisely instead of saying "as shown above".
 
-> **Conversion status.** **Chapters 1, 2, 9 and 11, plus §4.4–4.6 and §15.1, are complete**
-> in this style — numbered equations, explicit assumptions, step-by-step derivations,
-> worked numbers for this hardware, and a traps box per section. The remaining sections
-> still use the older terse ASCII form and read as a reference rather than a tutorial; they
-> are being converted incrementally, so expect the style to change mid-chapter in places.
+> **Conversion status.** **Chapters 1, 2, 5, 6, 9, 10 and 11, plus §4.4–4.6 and §15.1, are
+> complete** in this style — numbered equations, explicit assumptions, step-by-step
+> derivations, worked numbers for this hardware, and a traps box per section. Chapters 3,
+> 7, 8, 12–14 and 16–20 still use the older terse ASCII form and read as a reference rather
+> than a tutorial; they are being converted incrementally.
 >
 > Where a chapter is only partly converted, equation numbers are reserved for the sections
 > still to come: §4 therefore starts at **(4.5)**, reserving 4.1 to 4.4 for §4.2–4.3.
@@ -1413,13 +1413,17 @@ One shared implementation for both loops:
 > else                    { output = U; }
 > ```
 
-This is a **forward-Euler PI with clamping anti-windup**. Note that the discrete `ki`
-already absorbs the sample period: `ki_firmware = Ki_continuous · T_exec` (§15).
+This is a **backward-Euler PI with clamping anti-windup**. Backward, not forward: the
+integrator is advanced using the *current* error `e[k]`, not the previous one, so
+`I[k] = I[k-1] + ki·e[k]`. That maps `s → (1−z⁻¹)/T`, which is why the discrete gain
+absorbs the sample period as `ki_firmware = Ki_continuous · T_exec` — derived as (15.12).
 
-**[open]** On saturation the integrator is *overwritten* with the output limit rather than
-held or back-calculated. For the voltage loop that discards accumulated state (review
-§2.5). The **current** loop no longer relies on this path — its saturation is handled by
-explicit back-calculation on the summed duty (§8.3).
+> **Trap. [open]** On saturation the integrator is *overwritten* with the output limit
+> rather than held or back-calculated, so the voltage loop discards accumulated state
+> whenever it clips (review §2.5). The **current** loop no longer relies on this path — its
+> saturation is handled by explicit back-calculation on the summed duty (§8.3). This
+> matters more the higher `KP_V` goes: §15.4 notes that at the aggressive retune the
+> proportional term alone saturates at only 15.7 V of error.
 
 ### 5.2 Execution rate and gain scheduling
 
@@ -1454,6 +1458,18 @@ Halving `ki` for *large* errors (rather than raising it) is the deliberate choic
 a big transient the proportional term already commands a large correction, and a fast
 integrator on top of it is what causes overshoot on a bus with 91 ms of stored energy.
 
+There is a second, quantitative reason. Halving `ki` halves the PI zero, and by (15.11)
+that *increases* the lead term — so the large-error branch is not merely gentler, it is
+better damped: [derived]
+
+| branch | $f_z$ | $f_c$ | PM |
+|---|---|---|---|
+| small error, full `KI_V` | 4.17 Hz | 6.97 Hz | 54.1° |
+| large error, `KI_V/2` | 2.08 Hz | 6.31 Hz | **67.2°** |
+
+The loop trades ~10 % of bandwidth for 13° of extra margin exactly when a large transient
+is in progress. (Both figures assume the notch of §4.6 is enabled.)
+
 ### 5.3 Output limits and the meaning of the output
 
 ```
@@ -1469,7 +1485,11 @@ downwards. That is exactly the trap the burst-mode fix addressed (§12).
 
 ## 6. Current reference generation (the multiplier)
 
-> [pfc.c:913](project/pfc/pfc.c:913)
+**The question.** This is the handover point between the two loops — where a scalar power
+command becomes a shaped current reference. It is equation (2.4) implemented, so what is
+left to say is what the implementation adds beyond the theory.
+
+> [pfc.c:1004](project/pfc/pfc.c:1004)
 > ```c
 > float powerCommand = pData->piVoltage.output;
 > if (pData->loadFF.enable) powerCommand += pData->loadFF.powerFF;
@@ -1478,38 +1498,45 @@ downwards. That is exactly the trap the burst-mode fix addressed (§12).
 >                                   / pData->vacRMS.sqrOutput);
 > ```
 
-```
-                    P_command · |vg| · KMUL
-        i_ref  =  ──────────────────────────         [A]
-                            Vrms²
-```
+$$i_{ref} = \frac{P_{cmd}\cdot|v_g|\cdot K_{MUL}}{V_{rms}^2}\qquad[\text{A}] \tag{6.1}$$
 
-This is the resistor-emulation law of §2.2. Three things to note:
+#### Three things the implementation adds
 
 * **`KMUL = 1`.** In fixed-point ports this constant absorbs the sensor normalisations
-  (`Kvin`, `KiL`, `Kvo`). Here everything is in SI floats, so it is unity — but it is left
-  in place as the single knob if the sensing scales are ever renormalised.
-* **The `1/Vrms²` term is the line feed-forward.** It makes the loop gain from
-  `P_command` to actual input power independent of line voltage: without it, the outer
-  loop's gain would vary as `Vrms²` (a 4:1 range over 110–255 Vrms) and one set of PI
-  gains could not serve the whole input range.
-* **`i_ref` inherits the shape of `vg`** — including the flat notch at the zero crossing.
-  Near the zero crossing the reference is ~0 while `D_ideal → 1`; that combination is the
-  single most dangerous corner in the whole control law, and both §9 (the `Vg` floor) and
-  §10 (mode detection) exist partly to handle it.
+  ($K_{vin}$, $K_{iL}$, $K_{vo}$). Here everything is in SI floats so it is unity, but it
+  is left in place as the single knob if the sensing scales are ever renormalised.
+* **The $1/V_{rms}^2$ term is a line feed-forward, not just a normalisation.** It makes
+  the gain from $P_{cmd}$ to actual input power independent of line voltage. Without it
+  that gain would scale as $V_{rms}^2$ — a span of
+  $(255/110)^2 = \mathbf{5.4{:}1}$ across the declared 110–255 Vrms input range — and no
+  single set of voltage-loop gains could serve the whole range. With it, the outer loop
+  sees the same plant at every line voltage, which is why §15.3 can quote one crossover
+  figure rather than a range.
+* **$i_{ref}$ inherits the shape of $v_g$**, including the flat notch at the zero
+  crossing. There the reference is ~0 while $D_{ideal}\to1$ (§1.2) — the single most
+  dangerous corner in the whole control law. Both the $V_g$ floor of §9.4 and the mode
+  detection of §10 exist partly to handle it.
 
-Boundary check ([pfc.c:926](project/pfc/pfc.c:926)):
+#### Boundary check
 
-```
-i_ref clamped to [0, PFC_IREF_PEAK_MAX = 14.14 A]
-```
+> [pfc.c:1016](project/pfc/pfc.c:1016) — $i_{ref}$ clamped to
+> $[0,\ \text{PFC\_IREF\_PEAK\_MAX} = 14.14\ \text{A}]$
 
-14.14 A = `√2 × 10 Arms` design input current, deliberately **below** the 16.97 A software
-OCP trip (§14) so the controller clamps before protection fires.
+$14.14 = \sqrt2\times10$ Arms design input current, deliberately **below** the
+$\sqrt2\times12 = 16.97$ A software OCP trip (§14), so the controller clamps before
+protection fires. The ordering is the point: a clamp degrades performance, a trip stops
+the converter.
 
-**[open]** `vacRMS.sqrOutput` is a divisor with no lower bound. It is only non-zero after
-the first RMS window closes (which the state machine enforces before entering
-`PFC_CTRL_RUN`), but a total line loss mid-run drives it toward zero — see review §3.1.
+> **Traps.**
+>
+> * **[open] $V_{rms}^2$ is a divisor with no lower bound.** It is non-zero after the
+>   first RMS window closes — which the state machine enforces before entering
+>   `PFC_CTRL_RUN` — but a total line loss mid-run drives it toward zero (review §3.1).
+> * **The clamp is on the reference, not the current.** Clamping $i_{ref}$ flat-tops the
+>   requested waveform, which is itself a distortion mechanism; it is an abnormal-condition
+>   guard, not an operating mode.
+> * **$P_{cmd}$ is the sum of the PI output and the load feed-forward** (§7), which is why
+>   burst control must test `powerCommand` and not `piVoltage.output` (§12).
 
 ---
 
@@ -1838,22 +1865,54 @@ if (ff > PFC_MAX_DUTY) ff = PFC_MAX_DUTY; else if (ff < 0.0f) ff = 0.0f;
 
 ## 10. Conduction-mode detection
 
-> `PFC_ConductionModeDetect()` — [pfc.c:650](project/pfc/pfc.c:650)
+> `PFC_ConductionModeDetect()` — [pfc.c:740](project/pfc/pfc.c:740)
 
 ### 10.1 Valley estimation
 
-Walk the CCM current trajectory forward from the mid-ON sample to the end of the period:
+**The question.** §1.4 and §11 both need to know whether *this* switching cycle was DCM.
+There is only one current sample per period, taken mid-ON — long before the answer is
+visible. How do you decide from that?
+
+#### Physical picture
+
+You cannot observe the end of the period, so **predict** it. Walk the CCM trajectory
+forward from the sample to where the current would land at the end of the OFF time, and
+see whether that prediction is negative. Negative is physically impossible — the diode
+blocks — so a negative prediction means the current must have hit zero early, which *is*
+DCM.
 
 ```
-rise over the remaining half of the ON time :  +(Vg/L)·(d·Ts/2)
-fall over the whole OFF time                :  +((Vg − Vo)/L)·(1 − d)·Ts
+   CCM: prediction lands >= 0        DCM: prediction lands < 0 (impossible)
+        /|                                 /|
+       / | \                              / | \
+   ---X--+--\---                      ---X--+--\
+     /   |   \___ valley >= 0            /  |   \
+                                                 \___ predicted
+    0 ----------------                0 ----------\---------
+                                                    v  actual current
+                                                       stopped at 0
 ```
 
-Collecting terms:
+#### Derivation
 
-```
-        i_valley = i_sample + (Ts/L)·[ Vg·(1 − d/2) − Vo·(1 − d) ]
-```
+From the mid-ON sample, two intervals remain. The current rises for the second half of the
+ON time and then falls for the whole OFF time:
+
+$$\Delta i_{ON} = \frac{V_g}{L}\cdot\frac{d\,T_s}{2},
+\qquad
+\Delta i_{OFF} = \frac{V_g - V_o}{L}(1-d)T_s$$
+
+Adding both to the sample and factoring out $T_s/L$:
+
+$$i_{valley} = i_{sample} + \frac{T_s}{L}\Bigl[V_g\tfrac{d}{2} + (V_g-V_o)(1-d)\Bigr]$$
+
+Expanding the second product and collecting the $V_g$ terms —
+$V_g\tfrac{d}{2} + V_g - V_g d = V_g(1 - \tfrac{d}{2})$ — gives the implemented form:
+
+$$\boxed{\;i_{valley} = i_{sample} + \frac{T_s}{L}\Bigl[V_g\left(1-\frac{d}{2}\right) - V_o(1-d)\Bigr]\;}
+\tag{10.1}$$
+
+$$\text{DCM} \iff i_{valley} < 0 \tag{10.2}$$
 
 > ```c
 > pData->iValleyEst = pData->iL
@@ -1862,46 +1921,81 @@ Collecting terms:
 > return (pData->iValleyEst < 0.0f) ? 1u : 0u;
 > ```
 
-Interpretation:
+#### Sanity check: (10.1) collapses to something obvious in CCM
 
-* **In CCM** the current really does follow that path, so the estimate *is* the valley and
-  is `≥ 0`.
-* **In DCM** the current hits zero before the OFF time is up and then stays there. The
-  continued-slope estimate keeps going and lands **negative**. The magnitude of the
-  negative excursion is a measure of how deep into DCM the converter is.
+In CCM steady state $d = D_{ideal}$, so by (1.3b) $V_o(1-d) = V_g$. The bracket becomes
+
+$$V_g\left(1-\frac{d}{2}\right) - V_g = -\,\frac{V_g d}{2}$$
+
+and therefore
+
+$$i_{valley} = i_{sample} - \frac{T_s V_g d}{2L} = i_{sample} - \frac{\Delta I}{2}$$
+
+using (1.4). **In CCM the estimator reduces exactly to "sample minus half the ripple"** —
+which is the definition of the valley, and confirms both the algebra and the choice of
+sampling instant (§3.2). [derived]
+
+#### Numbers
+
+| operating point | $i_{sample}$ | $i_{valley}$ from (10.1) | verdict |
+|---|---|---|---|
+| line peak, CCM ($V_g=325.3$, $d=0.144$) | 2.31 A | **+1.77 A** | CCM |
+| deep DCM ($V_g=100$, $d_1=0.20$) | 0.230 A | **−4.69 A** | DCM |
+
+The CCM row equals $2.31 - \Delta I/2 = 2.31 - 0.54$ exactly, as the check above predicts.
+The DCM row is *strongly* negative rather than marginally so — the test is not operating
+near its threshold at a representative DCM point, which is what makes it robust. [derived]
 
 ### 10.2 Why a fixed-zero threshold matters
 
-The alternative (legacy) test infers DCM by comparing a *lagged controller output*
-(`d1`) against a *computed ratio* (`D_ideal`) — see §11.2. That is a comparison between
-two noisy, time-skewed quantities, and right at the boundary it jitters on sample noise.
-Every toggle is a duty discontinuity, and duty discontinuities at a fixed point in the
-line cycle appear as **input-current distortion**.
+**The question.** Method 1 (§11.2) also detects DCM, using only quantities the controller
+already has. Why add a separate predictor?
 
-The valley estimate compares against a **fixed zero**. The decision still depends on
-measurements, but the threshold does not move, so boundary chatter is greatly reduced.
+Because of *what the threshold is made of*. The legacy test compares a lagged controller
+output ($d_1$) against a computed ratio ($D_{ideal}$) — two noisy, time-skewed quantities,
+either of which can move for reasons unrelated to conduction mode. At the boundary the
+comparison jitters on sample noise, and **every toggle is a duty discontinuity**.
+Discontinuities that recur at a fixed point in the line cycle are not random noise: they
+are periodic, so they appear as input-current *distortion*.
+
+The valley estimate compares against a **fixed zero**. The prediction still depends on
+measurements, but the threshold itself cannot move, so boundary chatter is greatly reduced.
 
 Reference: H. S. Nair and N. L. Narasamma, *"An Improved Digital Algorithm for Boost PFC
 Converter Operating in Mixed Conduction Mode"*, IEEE JESTPE vol. 8 no. 4, Dec 2020,
-eq. (4) and (6) — cited in [pfc.h:141](project/pfc/pfc.h:141). The mid-ON sampling
+eq. (4) and (6) — cited in [pfc.h:169](project/pfc/pfc.h:169). The mid-ON sampling
 assumption in that paper matches this implementation exactly.
 
 ### 10.3 Always evaluated
 
 `PFC_ConductionModeDetect()` runs **every cycle regardless of the selected method**
-([pfc.c:696](project/pfc/pfc.c:696)), and `iValleyEst` is published in the struct. This is
-deliberate instrumentation: a single X2C-Scope run shows what valley estimation *would
-have* decided while a different method is actually driving the loop. It costs a handful of
-floating-point operations.
+([pfc.c:786](project/pfc/pfc.c:786)), and `iValleyEst` is published in the struct.
+
+This is deliberate instrumentation, and it costs a handful of floating-point operations. A
+single X2C-Scope capture shows what valley estimation *would have* decided while a
+different method actually drives the loop — so the two detectors can be compared on one
+run rather than two (§11.3).
 
 ### 10.4 Model sensitivity
 
-The estimate depends on `L` through `Ts/L`. **[open]** `PFC_INDUCTANCE = 680 µH` is a
-single constant; if the boost choke is a swinging/powder core, `L` falls with current and
-the constant is only correct at one operating point. The detector degrades gracefully (the
-boundary shifts slightly), but any future *predictive* duty computation would inherit the
-error directly — flagged in
-[pfc_userparams.h:182](project/pfc/pfc_userparams.h:182).
+**The question.** (10.1) is a model, not a measurement. What is it sensitive to?
+
+Everything enters through the constant $T_s/L$. $T_s$ is exact; $L$ is not.
+
+> **Traps.**
+>
+> * **[open] $L$ is a single constant.** `PFC_INDUCTANCE = 680 µH`
+>   ([pfc_userparams.h:234](project/pfc/pfc_userparams.h:234)) — but if the boost choke is
+>   a swinging or powder core, $L$ falls with current and the constant is correct at only
+>   one operating point. The detector degrades gracefully, since an error in $T_s/L$ shifts
+>   the boundary slightly rather than inverting the decision. Any future *predictive* duty
+>   computation would inherit the error directly, which is the real reason to care.
+> * **The same $L$ error propagates into §11.** The reconstruction factor (11.1) uses
+>   $D_{ideal}$, which is $L$-free — but the DCM feed-forward (9.3) carries $2L/T_s$
+>   explicitly. An $L$ error therefore biases the feed-forward and the mode boundary in
+>   different ways.
+> * **(10.1) assumes the duty $d$ that produced this sample**, not the one about to be
+>   applied — the same one-cycle skew discussed in §11.1.
 
 ---
 
