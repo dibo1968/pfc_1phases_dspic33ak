@@ -39,11 +39,14 @@ readable everywhere.
 Display equations are numbered by chapter — `(1.4)` is the fourth in chapter 1 — so later
 sections can refer to them precisely instead of saying "as shown above".
 
-> **Conversion status.** **Chapter 1 is complete** in this style — numbered equations,
-> explicit assumptions, step-by-step derivations, worked numbers for this hardware, and a
-> traps box per section. Chapters 2–20 still use the older terse ASCII form and read as a
-> reference rather than a tutorial. They are being converted incrementally, so expect the
-> style to change at the §1.5 / §2 boundary.
+> **Conversion status.** **Chapters 1 and 2, and §15.1, are complete** in this style —
+> numbered equations, explicit assumptions, step-by-step derivations, worked numbers for
+> this hardware, and a traps box per section. Chapters 3–14 and 16–20 still use the older
+> terse ASCII form and read as a reference rather than a tutorial. They are being
+> converted incrementally, so expect the style to change at the §2.5 / §3 boundary.
+>
+> If you are here to understand the loop tuning specifically, read
+> **§1.5 → §2.4 → §15.1 → §15.2–15.4**, in that order.
 
 Statements are labelled where they are not directly readable from the source:
 **[derived]** = obtained here from the code/parameters by calculation;
@@ -633,64 +636,197 @@ $$\frac{1}{C V_o} = \frac{1}{1410\times10^{-6}\times380} = \frac{1}{0.5358} = 1.
 
 ### 2.1 What the problem is
 
-A bridge rectifier feeding a bulk capacitor draws current only while the line exceeds the
-capacitor voltage — narrow, high-amplitude pulses near the peak. Consequences:
+**The question.** A diode bridge feeding a bulk capacitor works perfectly well as a power
+supply. What exactly is wrong with it, and how do we put a number on "wrong"?
 
-* **Poor power factor.** `PF = P/(Vrms·Irms)`. It factors into
-  ```
-  PF = cos(φ1) · 1/sqrt(1 + THD_i²)
-       ^^^^^^^^   ^^^^^^^^^^^^^^^^^
-       displacement    distortion factor
-  ```
-  For a capacitor-input rectifier the displacement term is near unity but the distortion
-  term is terrible (THD 100 %+, PF ≈ 0.6).
-* **Harmonic currents** (3rd, 5th, 7th …) that heat neutrals and transformers and are
-  limited by standards such as IEC 61000-3-2.
-* **Poor utilisation** of the mains socket: at PF 0.6 a 10 A socket delivers ~1.4 kW
-  instead of 2.3 kW.
+#### Physical picture
 
-An active boost PFC stage forces the input current to be proportional to, and in phase
-with, the input voltage.
+The capacitor holds up near the peak of the line, so the diodes can only conduct during
+the brief window when the instantaneous line voltage exceeds it. The result is a narrow,
+tall current pulse twice per cycle:
+
+```
+  v_line   ___                       ___
+          /   \                     /   \        cap voltage (nearly flat) ....
+    ...../.....\.................../.....\....
+        /       \                 /       \
+  -----+---------+---------------+---------+-----
+  i_in      ||                        ||
+            ||   <- conducts only     ||         narrow, tall pulses
+            ||      here (~20-30 deg) ||
+```
+
+The load gets its power, so nothing looks broken. The damage is entirely in the *shape* of
+the current.
+
+#### Derivation: why shape costs you power factor
+
+Power factor is real power over apparent power:
+
+$$\text{PF} = \frac{P}{V_{rms} I_{rms}} \tag{2.1}$$
+
+**Step 1 — only the fundamental carries real power.** With a sinusoidal supply voltage,
+the average of $v \cdot i$ over a cycle picks out only the current component at the same
+frequency; every harmonic integrates to zero against it. So
+$P = V_{rms} I_{1,rms}\cos\varphi_1$, where $I_1$ is the fundamental and $\varphi_1$ its
+phase.
+
+**Step 2 — but every harmonic still counts toward $I_{rms}$.** RMS adds in quadrature
+across all components:
+
+$$I_{rms}^2 = I_{1,rms}^2 + \sum_{n\ge2} I_{n,rms}^2
+= I_{1,rms}^2\left(1 + \text{THD}_i^2\right)$$
+
+using the definition $\text{THD}_i = \sqrt{\sum_{n\ge2}I_n^2}\,/\,I_1$.
+
+**Step 3 — substitute both into (2.1).** The $I_{1,rms}$ cancels:
+
+$$\boxed{\;\text{PF} = \underbrace{\cos\varphi_1}_{\text{displacement}}
+        \cdot \underbrace{\frac{1}{\sqrt{1+\text{THD}_i^2}}}_{\text{distortion}}\;}
+\tag{2.2}$$
+
+This is the key insight: **you can lose power factor without any phase shift at all.** The
+rectifier's current pulse is centred on the voltage peak, so $\cos\varphi_1 \approx 1$ —
+the displacement term is nearly perfect. All the loss is in the second factor.
+
+#### Numbers
+
+Inverting (2.2) at $\cos\varphi_1 = 1$: [derived]
+
+| PF | implied THD$_i$ |
+|---|---|
+| 0.60 (typical capacitor-input rectifier) | **133 %** |
+| 0.70 | 102 % |
+| 0.95 | 33 % |
+| 0.99 (a working PFC) | 14 % |
+
+Three consequences follow:
+
+* **Harmonic currents** (3rd, 5th, 7th …) flow back into the supply, heating neutral
+  conductors and transformers. Limited by standards such as IEC 61000-3-2.
+* **Wasted socket capacity.** A 230 V / 10 A outlet supplies 2300 VA. At PF 0.6 that is
+  only **1380 W** of real power; at PF 0.99, 2277 W.
+* **Higher RMS current for the same power**, so more $I^2R$ loss everywhere upstream.
+
+An active boost PFC stage fixes this by forcing the input current to be proportional to,
+and in phase with, the input voltage.
+
+> **Traps.**
+>
+> * **PF is not $\cos\varphi$.** That equivalence holds only for sinusoidal current. For
+>   a rectifier the displacement term is the *good* one and the distortion term is what
+>   ruins the result — quoting "power factor" as a phase angle is meaningless here.
+> * **THD is referenced to the fundamental, not to the total.** THD > 100 % is perfectly
+>   possible and routine for capacitor-input rectifiers, as the table shows.
 
 ### 2.2 Resistor emulation
 
-The control objective is stated compactly as *make the converter look like a resistor to
-the line*:
+**The question.** "Make the current sinusoidal" is a waveform description, not a control
+law. What quantity should the controller actually regulate?
 
-```
-i_in(t) = v_in(t) / R_emulated
-```
+#### The objective
 
-Since the average input power is `P = Vrms²/R_emulated`, the emulated conductance
-is `1/R_emulated = P/Vrms²`, and the current the converter must draw is
+A pure resistor is the ideal load as far as the mains is concerned: its current is
+proportional to voltage and exactly in phase, so both factors in (2.2) are unity by
+construction. So state the goal as *make the converter look like a resistor*:
 
-```
-        i_ref(t) = P_command · vg(t) / Vrms²
-```
+$$i_{in}(t) = \frac{v_{in}(t)}{R_e} \tag{2.3}$$
 
-This *is* the multiplier equation in the firmware ([pfc.c:922](project/pfc/pfc.c:922)) —
-see §6. `P_command` is produced by the voltage loop (and the load feed-forward), so the
-outer loop's job is literally "choose the emulated resistance".
+where $R_e$ is an **emulated** resistance — a number the controller chooses, not a
+component.
 
-Note the units: `[W]·[V]/[V²] = [A]`. The voltage-loop output is therefore in **watts**,
-which is why its clamp is `PI_V_OUT_MAX = 1500` — the board's rated power.
+#### Derivation: turning that into a reference
+
+The average power drawn by (2.3) is $P = V_{rms}^2/R_e$, so the emulated *conductance*
+the controller must set is $1/R_e = P/V_{rms}^2$. Substituting back into (2.3), with the
+rectified input $v_g$ in place of $v_{in}$:
+
+$$\boxed{\;i_{ref}(t) = P_{cmd}\cdot\frac{v_g(t)}{V_{rms}^2}\;} \tag{2.4}$$
+
+Check the units: $[\mathrm{W}]\cdot[\mathrm{V}]/[\mathrm{V^2}] = [\mathrm{A}]$. The
+voltage-loop output is therefore genuinely in **watts** — which is why its clamp is
+`PI_V_OUT_MAX = 1500`, the board's rated power, and why the bus plant (1.16) is a
+power-to-voltage transfer.
+
+This turns the whole outer loop into a single sentence: **the voltage loop's job is to
+choose the emulated resistance.** If the bus is sagging it lowers $R_e$ to draw more
+power; if the bus is high it raises it.
+
+#### Numbers
+
+At 375 W from a 230 Vrms line: [derived]
+
+$$R_e = \frac{230^2}{375} = 141\ \Omega,\qquad
+\hat{I} = \frac{325.3}{141} = 2.31\ \text{A},\qquad
+I_{rms} = \frac{375}{230} = 1.63\ \text{A}$$
+
+and $2.31/\sqrt2 = 1.63$ ✓ — the current really is sinusoidal, so peak and RMS are related
+by $\sqrt2$ exactly.
+
+#### In the firmware
+
+Equation (2.4) is implemented literally — see §6:
+
+> [pfc.c:1012](project/pfc/pfc.c:1012)
+> ```c
+> pData->currentReference = (float)((powerCommand * pData->rectifiedVac * KMUL)
+>                     / pData->vacRMS.sqrOutput);
+> ```
+
+> **Traps.**
+>
+> * **$R_e$ dissipates nothing.** The converter *behaves* like a resistor at its input
+>   while delivering the energy to the bus. The analogy is about the terminal
+>   relationship only.
+> * **The emulation is only valid on a switching-period average.** Within one period the
+>   input current is a triangle (§1.3); it is the *average* of that triangle which
+>   follows (2.4).
+> * **$V_{rms}^2$ in the denominator is a measured, filtered quantity** that updates once
+>   per half line cycle (§4.4). After a line step it is stale, which briefly mis-scales
+>   $R_e$.
 
 ### 2.3 Control strategy: average current mode control (ACMC)
 
-Options for shaping the input current, and why this design uses ACMC:
+**The question.** Given the reference (2.4), what control architecture actually forces the
+inductor current to follow it?
+
+#### The options
 
 | Method | Sensing | Switching freq. | Notes |
 |---|---|---|---|
-| Peak current mode | comparator on iL | fixed | needs slope compensation; peak ≠ average → distortion |
-| Hysteretic | comparator, two thresholds | variable | simple, but variable-frequency EMI |
-| Boundary/critical (BCM) | zero-current detect | variable | popular <300 W; high peak currents |
-| **Average current mode (ACMC)** | **sampled iL, digital PI** | **fixed 64 kHz** | **used here**: fixed frequency, low distortion, works in CCM and (with §11) DCM |
+| Peak current mode | comparator on $i_L$ | fixed | needs slope compensation; peak ≠ average, so the error is duty-dependent → distortion |
+| Hysteretic | comparator, two thresholds | variable | simple, but variable-frequency EMI is hard to filter |
+| Boundary / critical (BCM) | zero-current detect | variable | popular below ~300 W; high peak currents, poor at high power |
+| **Average current mode (ACMC)** | **sampled $i_L$, digital PI** | **fixed 64 kHz** | **used here**: fixed frequency, low distortion, works in CCM and — with §11 — in DCM |
 
-ACMC closes a fast loop on the *average* inductor current against the sinusoidal
-reference. This is where the sampling subtleties of §4.4 and §11 come from: the loop is
-only as good as its estimate of the true cycle average.
+ACMC closes a fast loop on the *cycle-average* inductor current against the sinusoidal
+reference. Two properties make it the right choice here: the switching frequency is fixed
+(so the EMI filter is a fixed design), and it regulates the quantity that (2.4) actually
+specifies — the average, not the peak.
+
+That last point is also its one weakness, and it propagates through much of this document:
+**ACMC is only as good as its estimate of the true cycle average.** A single ADC sample
+per period is exact in CCM only if taken at the right instant (§3.2), and in DCM it is
+wrong by a known factor that has to be reconstructed (§11).
+
+> **Traps.**
+>
+> * **Peak current mode's error is not a constant offset.** The peak-to-average gap is
+>   $\Delta I/2$, which by (1.5) varies across the line cycle — so it distorts the
+>   waveform rather than just scaling it. That is the main reason it is not used here.
+> * **"Average" means average over one switching period**, not over the line cycle. The
+>   reference itself is a rectified sinusoid that the loop must track.
 
 ### 2.4 Two-loop structure and the bandwidth split
+
+**The question.** Why must the voltage loop be made *deliberately slow* — slower than the
+disturbance it is supposed to reject? This is the least intuitive decision in the whole
+design, and getting it wrong is the classic way to build a PFC with poor THD.
+
+#### Physical picture
+
+Two nested loops, sharing the multiplier of (2.4) as the handover point. The outer loop
+sets *how much* power to draw; the inner loop shapes *when* to draw it:
 
 ```
                                             ┌─────────────────────────────┐
@@ -704,38 +840,160 @@ only as good as its estimate of the true cycle average.
                                                                                          d ──► PWM
 ```
 
-The critical constraint: **the voltage loop must be much slower than 100 Hz.** The bus of
-a single-phase PFC *necessarily* carries a `2·f_line` ripple, because instantaneous input
-power is `Vpk·Ipk·sin²(ωt) = (Vpk·Ipk/2)(1 − cos 2ωt)` while the load draws constant
-power. If the voltage loop responded to that ripple it would modulate `P_command` at
-100 Hz, and the multiplier would fold that into the current reference as **third-harmonic
-distortion**. Hence:
+The bandwidths differ by a factor of ~500 — 6.9 Hz against 3.2 kHz. The next three steps
+explain why that gap is mandatory rather than merely convenient.
 
-* voltage-loop crossover designed at **12 Hz** ([data file:99](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:99)),
-  though the script's plant carries a factor-2 error and the loop actually crosses at
-  **6.9 Hz** (§15.4);
-* the bus feedback is averaged over exactly one 100 Hz ripple period, so the ripple is
-  *structurally* nulled before it reaches the PI (§4.5);
-* and a 100 Hz notch does the same job for far less phase lag, which is what keeps the
-  phase margin healthy at that crossover (§4.6).
+#### Step 1 — the bus ripple is unavoidable physics
 
-The current loop, by contrast, must be fast enough to track a rectified sinusoid plus
-its harmonics — designed at 6.4 kHz, shipped at 3.2 kHz (§15).
+A resistor-emulating input draws $i = \hat I\sin\omega t$ from $v = \hat V\sin\omega t$,
+so the instantaneous input power is
+
+$$p_{in}(t) = \hat V\hat I\sin^2(\omega t)
+            = \underbrace{\frac{\hat V\hat I}{2}}_{P}\bigl(1 - \cos 2\omega t\bigr)
+\tag{2.5}$$
+
+The load, meanwhile, draws a constant $P$. The difference — a full-amplitude cosine at
+**twice the line frequency** — has nowhere to go but the bus capacitor. So a single-phase
+PFC bus *must* carry a $2f_{line}$ ripple. It is not a design flaw, a tuning problem, or
+something a better controller could remove; it is the consequence of drawing sinusoidal
+power from a single-phase source to feed a constant load. §2.5 sizes it.
+
+#### Step 2 — what happens if the voltage loop reacts to it
+
+Suppose the ripple leaks through the feedback path and modulates the power command by a
+fraction $m$:
+
+$$P_{cmd}(t) = P_0\bigl(1 + m\cos 2\omega t\bigr)$$
+
+Feed that through the multiplier (2.4), whose other input is $v_g \propto \sin\omega t$:
+
+$$i_{ref}(t) \;\propto\; P_0\bigl(1 + m\cos2\omega t\bigr)\sin\omega t
+= P_0\Bigl[\sin\omega t + m\,\underbrace{\cos2\omega t\,\sin\omega t}_{\text{product}}\Bigr]$$
+
+Apply the product-to-sum identity
+$\sin A\cos B = \tfrac12\left[\sin(A{+}B) + \sin(A{-}B)\right]$ with $A=\omega t$,
+$B=2\omega t$:
+
+$$\cos2\omega t\,\sin\omega t = \tfrac12\bigl[\sin 3\omega t + \sin(-\omega t)\bigr]
+= \tfrac12\bigl[\sin 3\omega t - \sin\omega t\bigr]$$
+
+Substituting back and collecting terms:
+
+$$i_{ref}(t) \;\propto\; \left(1-\frac{m}{2}\right)\sin\omega t
+\;+\;\frac{m}{2}\sin 3\omega t \tag{2.6}$$
+
+**A ripple on the power command becomes a third harmonic in the input current.** The
+fundamental shrinks slightly and a third harmonic appears from nowhere. Its relative size:
+
+$$\frac{I_3}{I_1} = \frac{m/2}{1 - m/2} \;\approx\; \frac{m}{2}
+\qquad\text{for small } m \tag{2.7}$$
+
+So **a 1 % ripple on $P_{cmd}$ buys roughly 0.5 % third-harmonic distortion** — a clean,
+memorable design rule, and the number that every filtering decision in §4.5–4.6 is
+measured against.
+
+#### Numbers
+
+Using (2.7) with the measured power-command ripple from the SiL model: [derived]
+
+| Vdc feedback path | $P_{cmd}$ ripple $m$ | implied $I_3/I_1$ |
+|---|---|---|
+| none (raw `vdc` into the PI) | ~6 % | **3.1 %** |
+| 10 ms block average, 50.0 Hz line | 0.00 % | ~0 |
+| notch + pole, 50.0 Hz line | 0.01 % | 0.01 % |
+| notch + pole, 50.5 Hz line (1 % off-tune) | 1.11 % | **0.56 %** |
+
+Even the worst filtered case sits far below the IEC 61000-3-2 third-harmonic limit. The
+unfiltered case does not, which is why this is not optional.
+
+#### Step 3 — the three defences
+
+$$\text{ripple at the PI} = \underbrace{|H_{fb}(j2\omega)|}_{\text{filtering}}
+\times\underbrace{|S(j2\omega)|}_{\text{loop is slow here}}\times\;\hat v_{ripple}$$
+
+* **A slow loop.** Crossover designed at 12 Hz
+  ([data file:99](SimulinkProject/mchp_pfc_foc_dsPIC33A_data.m:99)) — though the script's
+  plant carries a factor-2 error and the loop actually crosses at **6.9 Hz** (§15.4). At
+  100 Hz the loop gain is far below 1, so $|S|\to1$ and the feedback simply does not act.
+* **A structural null.** The bus feedback is averaged over exactly one 100 Hz ripple
+  period, so the ripple and all its harmonics are nulled before reaching the PI (§4.5).
+* **A notch.** Same null for a fraction of the phase cost, which is what keeps the phase
+  margin healthy at that crossover (§4.6).
+
+The current loop has the opposite requirement: it must be *fast* enough to track a
+rectified sinusoid and its harmonics — designed at 6.4 kHz, shipped at 3.2 kHz (§15.2).
+The two-loop split exists precisely because these requirements are irreconcilable in one
+controller.
+
+> **Traps.**
+>
+> * **It is the *voltage* loop that must be slow.** Slowing the current loop to fix THD
+>   would make it worse — that loop has to track the reference, not reject it.
+> * **The 100 Hz bus ripple is not a fault.** It is (2.5). Do not tune it away; the only
+>   lever on its size is $C$ (§2.5).
+> * **A perfectly nulled filter still leaves this exposure.** The boxcar's null is exact
+>   only at exactly 100 Hz; real mains drifts, and the notch is narrower still (§4.6).
+>   The right question is never "is it nulled" but "how much survives, and does (2.7)
+>   turn that into acceptable THD".
 
 ### 2.5 Bus sizing, ripple and hold-up
 
-With `C = 1410 µF` (`3 × 470 µF`) and `Vo = 380 V`:
+**The question.** How large must the bus capacitor be? Two independent requirements set
+it — the ripple of (2.5) must stay small, and the bus must hold up long enough through a
+line dropout.
 
-```
-Bus ripple (2·f_line):  v_ripple_pk = (P/Vo)/(2·ω_line·C) = P/336.6   [derived]
-                        → at 375 W: 1.11 V peak, 2.2 V pk-pk
+#### Derivation: the ripple
 
-Hold-up to the UV trip: E = ½C(380² − 310²) = 34.0 J                  [derived]
-                        → at 375 W: 91 ms of ride-through
-```
+From (2.5), the power the capacitor must absorb and return is $-P\cos2\omega t$. Dividing
+by the bus voltage gives the capacitor current, and integrating gives the voltage:
+
+$$i_C(t) = \frac{-P\cos2\omega t}{V_o}
+\;\;\Longrightarrow\;\;
+\hat v_{ripple} = \frac{1}{C}\int i_C\,dt = \frac{P}{2\,\omega_{line}\,V_o\,C} \tag{2.8}$$
+
+Note the $2\omega$ in the denominator — the ripple is at twice the line frequency, which
+halves it compared with a naive single-frequency estimate.
+
+#### Derivation: the hold-up
+
+Hold-up is an *energy* question. Usable energy is what sits between the nominal bus and
+the under-voltage trip, and the time it lasts is that energy divided by the load:
+
+$$E_{usable} = \tfrac12 C\left(V_o^2 - V_{UV}^2\right),
+\qquad t_{hold} = \frac{E_{usable}}{P} \tag{2.9}$$
+
+#### Numbers for this hardware
+
+With $C = 1410\ \mu F$ ($3\times470\ \mu F$), $V_o = 380$ V, $V_{UV} = 310$ V
+(`PFC_OUTPUT_UNDER_VOLTAGE`): [derived]
+
+$$2\omega_{line}V_oC = 2(314.16)(380)(1410\times10^{-6}) = 336.7
+\;\;\Longrightarrow\;\; \hat v_{ripple} = \frac{P}{336.7}$$
+
+$$E_{usable} = \tfrac12(1410\mu)(380^2 - 310^2) = 34.0\ \text{J}$$
+
+| load | bus ripple | hold-up |
+|---|---|---|
+| 120 W | 0.71 V pk-pk | 284 ms |
+| **375 W** | **2.23 V pk-pk** | **91 ms** |
+| 1500 W | 8.9 V pk-pk | 23 ms |
 
 The 91 ms figure is the quantity of interest for the pulse-load / bus-hold requirement
-that motivates this project.
+motivating this project. The 2.23 V pk-pk figure is the disturbance the voltage loop must
+*not* respond to (§2.4) — and it is the number the plant model was validated against in
+§15.4.
+
+> **Traps.**
+>
+> * **Ripple and hold-up both improve with larger $C$** — they are not in tension with
+>   each other. The real cost of more capacitance is size, price, inrush current and
+>   precharge time (§13.1).
+> * **Hold-up depends on where the UV trip sits, not on the nominal voltage.** Raising
+>   `PFC_OUTPUT_UNDER_VOLTAGE` from 310 V shortens ride-through sharply, because (2.9)
+>   goes as the *difference of squares*.
+> * **Ripple sets a floor on regulation tightness.** Quoting a bus regulation tighter
+>   than $\pm\hat v_{ripple}$ is meaningless — at full load this bus is inherently
+>   ±4.5 V before the controller does anything at all.
 
 ---
 
