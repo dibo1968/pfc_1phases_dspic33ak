@@ -39,11 +39,14 @@ readable everywhere.
 Display equations are numbered by chapter — `(1.4)` is the fourth in chapter 1 — so later
 sections can refer to them precisely instead of saying "as shown above".
 
-> **Conversion status.** **Chapters 1 and 2, and §15.1, are complete** in this style —
-> numbered equations, explicit assumptions, step-by-step derivations, worked numbers for
-> this hardware, and a traps box per section. Chapters 3–14 and 16–20 still use the older
-> terse ASCII form and read as a reference rather than a tutorial. They are being
-> converted incrementally, so expect the style to change at the §2.5 / §3 boundary.
+> **Conversion status.** **Chapters 1 and 2, §4.4–4.6 and §15.1 are complete** in this
+> style — numbered equations, explicit assumptions, step-by-step derivations, worked
+> numbers for this hardware, and a traps box per section. The remaining sections still use
+> the older terse ASCII form and read as a reference rather than a tutorial; they are being
+> converted incrementally, so expect the style to change mid-chapter in places.
+>
+> Where a chapter is only partly converted, equation numbers are reserved for the sections
+> still to come: §4 therefore starts at **(4.5)**, reserving 4.1 to 4.4 for §4.2–4.3.
 >
 > If you are here to understand the loop tuning specifically, read
 > **§1.5 → §2.4 → §15.1 → §15.2–15.4**, in that order.
@@ -1180,8 +1183,32 @@ survives.
 
 ### 4.4 RMS-square of the input
 
-The multiplier needs `Vrms²`, not `Vrms` — so the firmware never takes the square root in
-the control path:
+**The question.** The multiplier (2.4) divides by $V_{rms}^2$. How is that measured, and
+what makes the measurement unbiased?
+
+#### Derivation: why a half-line-period window is exact
+
+The firmware needs $V_{rms}^2$, never $V_{rms}$ — so it never takes a square root in the
+control path. The estimator is the definition itself, over a window of $N$ samples:
+
+$$V_{rms}^2 \;\approx\; \frac{1}{N}\sum_{k=0}^{N-1} v_g^2[k] \tag{4.5}$$
+
+For this to be *exact* rather than approximate, the window must span a whole number of
+periods of $v_g^2$. Write $v_g = \hat V\sin\omega t$ and use the identity
+$\sin^2\theta = \tfrac12(1 - \cos 2\theta)$:
+
+$$\frac{1}{N}\sum v_g^2
+= \frac{\hat V^2}{2}\left(1 - \underbrace{\frac{1}{N}\sum\cos 2\omega t_k}_{\to\;0}\right)
+= \frac{\hat V^2}{2} = V_{rms}^2 \tag{4.6}$$
+
+The cosine term vanishes **exactly** — not approximately — provided the window covers an
+integer number of cycles of $\cos2\omega t$, whose period is *half* the line period. So a
+10 ms window on a 50 Hz line does it:
+
+$$N = \text{PFC\_RMS\_SQUARE\_COUNTMAX} = \frac{64000}{2\times50} = 640
+\;\;\text{samples} = 10\ \text{ms}$$
+
+#### In the firmware
 
 > `PFC_SquaredRMSCalculate()` — [pfc.c:968](project/pfc/pfc.c:968)
 > ```c
@@ -1193,107 +1220,180 @@ the control path:
 > }
 > ```
 
-Window: `PFC_RMS_SQUARE_COUNTMAX = 64000/(2·50) = 640` samples = **10 ms** = one half line
-period. Since `|sin|` has period `T_line/2`, a half-period window contains exactly one
-whole cycle of the rectified waveform — so `sqrOutput` is an unbiased `Vrms²`.
+The ordering — accumulate, **then** increment, **then** test with `>=` — is deliberate: it
+puts exactly `sampleLimit` terms over a `sampleLimit` divisor. Earlier code accumulated one
+extra term, and the consequences are worth seeing because they are not what you would
+guess: [derived]
 
-The `>=` test with the increment *before* it is deliberate: it makes the sum contain
-exactly `sampleLimit` terms for a `sampleLimit` divisor (the earlier code accumulated one
-extra term, biasing `sqrOutput` high by `1/640` and stretching the window past the
-half-cycle — review §1.4).
+| | mean error | window-to-window spread |
+|---|---|---|
+| 640 terms / 640 (current) | 0 (exact) | 0 |
+| 641 terms / 640 (old) | **+0.082 %** | **0.215 %**, beating with a 6.4 s period |
+
+The mean error is *not* the naive $1/640 = 0.156\,\%$ — that would be the answer for a DC
+input. For a sinusoid the extra sample lands at a different phase each window, so the real
+damage is that each window is 10.0156 ms instead of 10 ms. The window walks one sample per
+cycle relative to the line, (4.6) stops holding exactly, and `sqrOutput` develops a slow
+beat that takes 6.4 s to come back round.
+
+#### Numbers
+
+At 230 Vrms the estimator settles at $\hat V^2/2 = 52\,900\ \mathrm{V^2}$ — i.e. `sqrOutput`
+reads $230^2$ directly, which is why the protection thresholds in §14 are all pre-squared.
+
+> **Traps.**
+>
+> * **The window is tied to `PFC_INPUT_FREQUENCY`.** It is a compile-time 50 Hz. On a
+>   60 Hz line the window is no longer an integer number of half-periods, (4.6) stops
+>   holding, and `sqrOutput` ripples at the difference frequency.
+> * **`sqrOutput` updates once per 10 ms and is then held**, exactly like §4.5. After a
+>   line step the multiplier divides by a value up to a half-cycle stale (review §2.2,
+>   still open).
+> * **It is $V_{rms}^2$, not $V_{rms}$.** Anything compared against it must be squared
+>   too — a 255 V threshold is stored as `255*255`.
 
 ### 4.5 Bus averaging
+
+**The question.** The bus carries an unavoidable 100 Hz ripple (2.5), and §2.4 showed that
+letting it reach the voltage PI produces third-harmonic distortion. How is it removed, and
+what does the removal cost?
+
+#### Derivation: why a boxcar nulls a comb of frequencies
 
 > `PFC_Average(&vdcAVG, vdc)`, `sampleLimit = PFC_VDC_AVG_SAMPLES = 64000/(2·50) = 640`
 > ([pfc.c:200](project/pfc/pfc.c:200), [pfc_userparams.h:102](project/pfc/pfc_userparams.h:102))
 
-The window is **one full 100 Hz ripple period (10 ms)**. Averaging over an integer number
-of ripple periods nulls the ripple *and all its harmonics* structurally, which is the
-primary defence against third-harmonic input distortion (§2.4).
+An average over a window $T_w$ has the frequency response derived in (15.10):
 
-Two properties of this filter that matter for stability (both **[derived]**):
+$$H(j\omega) = e^{-j\omega T_w/2}\;\mathrm{sinc}\!\left(\frac{\omega T_w}{2}\right),
+\qquad \mathrm{sinc}(x) \equiv \frac{\sin x}{x}$$
 
-* It is a **block average, not a moving average** — `output` updates once per 10 ms and is
-  held. The effective delay is therefore ≈ half the window (averaging) + half the hold:
+The magnitude vanishes wherever $\sin(\omega T_w/2) = 0$ with $\omega \ne 0$, i.e.
 
-  ```
-  tau = (Tw + Th + Tsv)/2 = (10 ms + 10 ms + 0.1875 ms)/2 = 10.09 ms
-  ```
+$$\frac{\omega T_w}{2} = k\pi
+\;\;\Longrightarrow\;\;
+f = \frac{k}{T_w} = k \times 100\ \text{Hz},\quad k = 1,2,3\ldots \tag{4.7}$$
 
-  A 10 ms window costs **10 ms of delay, not 5** — the hold is as expensive as the average.
-  That is ~25° of phase lag at the real 6.90 Hz crossover (§15.4).
-* The same holds for `vacRMS.sqrOutput`: the multiplier's `1/Vrms²` term can be up to one
-  half-cycle stale after a line step (review §2.2, still open).
+So a 10 ms window does not merely attenuate the ripple — it places **exact nulls at 100 Hz
+and every one of its harmonics simultaneously**. That is what "structurally nulled" means,
+and it is a stronger guarantee than any tuned filter can give.
 
-Both were made 5× longer than the original 128-sample window when the ripple-nulling fix
-landed. That re-verification has now been done (2026-08-02, **[derived]**), against the
-corrected plant of §15.4:
+#### What it costs
 
-| Vdc feedback path | τ | fc | PM | GM |
+The catch is in the phase term. This is a **block** average, not a moving one: `output`
+updates once per 10 ms and is then held. Averaging contributes $T_w/2$ of delay, and the
+hold contributes another $T_h/2$:
+
+$$\tau = \frac{T_w + T_h + T_{sv}}{2}
+       = \frac{10 + 10 + 0.1875\ \text{ms}}{2} = 10.09\ \text{ms} \tag{4.8}$$
+
+**A 10 ms window costs 10 ms of delay, not 5** — the hold is exactly as expensive as the
+average. By (15.9) that is ~25° of phase at the 6.90 Hz crossover, and by (15.11) it comes
+straight off the phase margin.
+
+#### Numbers
+
+Both windows were made 5× longer than the original 128-sample one when the ripple-nulling
+fix landed. That re-verification has now been done (2026-08-02), against the corrected
+plant of §15.4: [derived]
+
+| Vdc feedback path | τ | $f_c$ | PM | GM |
 |---|---|---|---|---|
 | old 128-sample (2 ms) window | 2.09 ms | 6.98 Hz | 53.9° | 27.4 dB |
 | 640-sample (10 ms) window | 10.09 ms | 6.90 Hz | **33.8°** | 12.4 dB |
 | 10 ms window + notch (§4.6) | — | 6.97 Hz | **54.1°** | 19.3 dB |
 
-So the longer window cost ~20° of phase margin. `KP_V`/`KI_V` are nonetheless **unchanged**:
-the margin is cheaper to buy back in the filter than in the gains, which is what §4.6 does.
+The longer window cost ~20° of phase margin. `KP_V`/`KI_V` are nonetheless **unchanged** —
+the margin turned out to be cheaper to buy back in the filter than in the gains, which is
+what §4.6 does.
 
-For a PI acting on an integrator behind a boxcar, the margin has an exact closed form that
-matches the full Bode calculation to 0.1° — useful when re-tuning either the window or the
-gains:
-
-```
-PM = atan(fc/fz) − 360·fc·tau       [derived]
-     fz = (KI_V/Tsv)/KP_V/(2π), the PI zero;  tau as above
-```
+> **Traps.**
+>
+> * **Block average ≠ moving average.** A true sliding average over the same window would
+>   cost half the delay, because there would be no hold term in (4.8). The nulls of (4.7)
+>   would be identical. This is the single cheapest available improvement if the notch is
+>   ever removed.
+> * **The nulls are exact only at exactly 100 Hz.** They are deep and wide enough that
+>   ±1 % line drift is immaterial (−80 dB), but the guarantee is not unconditional.
+> * **`vacRMS.sqrOutput` has the same structure and the same staleness** (§4.4).
 
 ### 4.6 Bus notch and anti-noise pole
+
+**The question.** §4.5 rejects 100 Hz by low-passing everything, and pays 25° of phase for
+it. Can the same rejection be had for less phase?
+
+#### The idea
+
+Yes — because a boxcar is solving a harder problem than necessary. It attenuates every
+frequency above ~1/$T_w$, when all that is actually required is a null at 100 Hz. A
+second-order notch is *selective*: it can be deep at 100 Hz while barely touching 7 Hz.
+
+| filter | phase @7 Hz | @100 Hz | @101 Hz | @120 Hz | broadband noise |
+|---|---|---|---|---|---|
+| 10 ms block average | −25.2° | exact null | −80 dB | −32 dB | 0.03× |
+| notch Q=1 + 500 Hz pole | **−4.61°** | −137 dB | −34 dB | −10 dB | 0.14× |
+
+Five times less phase for the same job at the design frequency — that is the whole
+argument, and it is why the fix for the margin problem was a filter change rather than a
+gain change.
+
+#### The filter
 
 > `PFC_VdcFilterUpdate()` — [pfc.c:249](project/pfc/pfc.c:249),
 > constants at [pfc_userparams.h:126](project/pfc/pfc_userparams.h:126)
 
-The block average of §4.5 rejects 100 Hz by low-passing *everything*, and that is where its
-25° of lag comes from. A second-order notch reaches the same null while only being selective
-at 100 Hz, so it costs far less phase:
+A single real pole followed by an RBJ notch, both at the voltage-loop rate
+$f_s = f_{sw}/\text{VOLTAGE\_LOOP\_EXE\_RATE} = 5333.33$ Hz:
 
-| filter | phase @7 Hz | @100 Hz | @101 Hz | @120 Hz | broadband noise |
-|---|---|---|---|---|---|
-| 10 ms block average | −25.2° | −240 dB | −80 dB | −32 dB | 0.03× |
-| notch Q=1 + 500 Hz pole | **−4.61°** | −137 dB | −34 dB | −10 dB | 0.14× |
+$$y[k] \mathrel{+}= \bigl(v_{dc}[k] - y[k-1]\bigr)\alpha,
+\qquad \alpha = 1 - e^{-2\pi f_p/f_s} = 0.445145 \tag{4.9}$$
 
-The chain is a single real pole followed by an RBJ notch, both running at the voltage-loop
-rate `fsw/VOLTAGE_LOOP_EXE_RATE = 5333.33 Hz`:
+$$\omega_0 = \frac{2\pi f_0}{f_s},\quad
+a_\alpha = \frac{\sin\omega_0}{2Q},\quad a_0 = 1 + a_\alpha,\qquad
+\begin{aligned}
+b &= [\,1,\; -2\cos\omega_0,\; 1\,]/a_0\\
+a &= [\,a_0,\; -2\cos\omega_0,\; 1-a_\alpha\,]/a_0
+\end{aligned} \tag{4.10}$$
 
-```
-pole:   y += (vdc − y)·coeff,     coeff = 1 − exp(−2π·500/fs) = 0.445145
-notch:  w0 = 2π·100/fs,  alpha = sin(w0)/(2Q),  a0 = 1 + alpha
-        b = [1, −2cos(w0), 1]/a0        a = [a0, −2cos(w0), 1−alpha]/a0
-        ⇒ b0 = b2 = 0.944493355,  b1 = a1 = −1.875893116,  a2 = 0.888986709
-```
+giving $b_0 = b_2 = 0.944493355$, $b_1 = a_1 = -1.875893116$, $a_2 = 0.888986709$.
 
-Three design points worth keeping **[derived]**:
+#### Three design points [derived]
 
-* **The pole is not optional.** A bare notch does no broadband averaging at all (1.0× versus
-  the boxcar's 0.03×), so ADC noise would reach `KP_V` unattenuated. The 500 Hz pole restores
-  most of that for ~0.8° of phase.
+* **The pole is not optional.** A bare notch does no broadband averaging at all (1.0×
+  against the boxcar's 0.03×), so ADC noise would reach `KP_V` unattenuated. The 500 Hz
+  pole restores most of that for ~0.8° of phase.
 * **Run it at the voltage-loop rate, never at the 64 kHz ISR.** At 64 kHz a 100 Hz biquad
   sits at a pole radius of ~0.995, and float32 cancellation against the ~380 V DC pedestal
-  caps the achievable null near −33 dB — which would discard most of the benefit.
-* **DC gain is exactly 1**, so `x1=x2=y1=y2=v` is a true fixed point. `PFC_VdcFilterReset()`
-  exploits that to start the chain already settled instead of charging up from zero.
+  caps the achievable null near −33 dB — discarding most of the benefit.
+* **DC gain is exactly 1**, so $x_1=x_2=y_1=y_2=v$ is a true fixed point.
+  `PFC_VdcFilterReset()` exploits that to start the chain already settled rather than
+  charging up from zero.
 
-Only the voltage PI consumes the result, via `PFC_T.vdcFeedback`. Precharge, the OV/UV trips
-and the load feed-forward keep reading `vdcAVG.output`, which is slower but far more
-noise-immune — protection wants robustness, not bandwidth.
+Only the voltage PI consumes the result, via `PFC_T.vdcFeedback`. Precharge, the OV/UV
+trips and the load feed-forward keep reading `vdcAVG.output` — protection wants noise
+immunity, not bandwidth.
 
-Effect on a 120 W → 375 W load step, gains unchanged **[derived]**: bus dip 11.47 → 9.00 V,
-overshoot 1.66 → 0.77 V, settling 160 → 106 ms.
+#### Numbers
 
-**Caveat — this is a 50 Hz-only tuning.** Off-tune the notch degrades much faster than the
-boxcar: −34 dB at 101 Hz against −80 dB, and only −10 dB at 120 Hz. At 50 Hz ±1 % the
-resulting 100 Hz feedthrough into the power command is ~0.23 %, immaterial. On **60 Hz mains
-it is not adequate** — retune `f0` to 120 Hz along with `PFC_INPUT_FREQUENCY`, or set
-`pfcParam.vdcNotch.enable = 0`, which restores the §4.5 behaviour exactly.
+On a 120 W → 375 W load step with gains unchanged: [derived]
+
+| | dip | overshoot | settling |
+|---|---|---|---|
+| block average alone | 11.47 V | 1.66 V | 160 ms |
+| **+ notch and pole** | **9.00 V** | **0.77 V** | **106 ms** |
+
+> **Traps.**
+>
+> * **This is a 50 Hz-only tuning, and it degrades faster off-tune than the boxcar** —
+>   −34 dB at 101 Hz against −80 dB, and only −10 dB at 120 Hz. At 50 Hz ±1 % the
+>   resulting feedthrough is ~0.23 % of the power command, which by (2.7) is ~0.12 %
+>   third harmonic — immaterial. On **60 Hz mains it is not adequate**: retune $f_0$ to
+>   120 Hz along with `PFC_INPUT_FREQUENCY`, or set `pfcParam.vdcNotch.enable = 0`, which
+>   restores the §4.5 behaviour exactly.
+> * **A notch is not a delay**, so (15.11) cannot be used with it — read its phase
+>   directly off (4.10) at the crossover frequency instead.
+> * **The coefficients are tied to $f_s$.** Changing `VOLTAGE_LOOP_EXE_RATE` invalidates
+>   every literal in (4.10), and nothing in the build will warn you.
 
 ---
 
