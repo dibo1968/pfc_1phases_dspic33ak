@@ -174,6 +174,22 @@ threshold also interacts with §3.6 (OP_UV recovery).
 
 ---
 
+### 2.5 [LOW] One-tick stale-duty window on fault entry  **[FIXED 2026-08-03]**
+
+> Found by the SiL test catalogue (profile 12, line-dropout), not by the
+> original review: `PFC_StateCtrlRun` returned `PFC_FAULT` without safing the
+> outputs, and since the ISR writes `PFC_PWM_PDC` after the state machine, the
+> converter switched one more full PWM period (15.6 µs) at the stale pre-fault
+> duty before `PFC_StateFault` zeroed it — measured as duty 8787 counts
+> (~17.6 %) at the t = 0.916000 fault sample, cleared at 0.916016. Immaterial
+> for the voltage faults; avoidable latency on the software over-current path
+> (§4.5). **Resolution:** the fault branch now zeroes
+> `duty`/`dutyRatio`/`dutyFF` and calls `HAL_PFCPWMDisableOutputs()` in the
+> detection tick (`PFC_StateFault` keeps its idempotent safing). SiL-verified
+> 2026-08-03: duty = 0 at the first fault sample, zero nonzero-duty samples in
+> the fault window, all other profile-12 numbers unchanged
+> (trip 0.9160 s / clear 0.9860 s / bus min 323.9 V / final 380.1 V).
+
 ## 3. Latent bugs and fragile constructs
 
 ### 3.1 [CRIT-verify] Center-aligned PWM with a full-period PG4PER — the real switching frequency may be 32 kHz, not 64 kHz

@@ -494,6 +494,18 @@ static PFC_CTRL_STATE_T PFC_StateCtrlRun(PFC_T *pfcData)
     PFC_FaultCheck(pfcData);
     if(pfcData->faultStatus != PFC_FAULT_NONE)
     {
+        /** Safe the outputs in THIS tick, not the next one. The ISR writes
+            PFC_PWM_PDC after the state machine returns, so returning alone
+            would let the stale pre-fault duty run for one more full PWM
+            period before PFC_StateFault zeroes it (measured in SiL: fault
+            flagged at t=0.916000, duty still 17.6% until 0.916016). One
+            period is immaterial for the voltage faults but adds avoidable
+            latency to the software over-current path. PFC_StateFault repeats
+            these assignments; that redundancy is deliberate. */
+        pfcData->duty = 0;
+        pfcData->dutyRatio = 0;
+        pfcData->dutyFF = 0;
+        HAL_PFCPWMDisableOutputs();
         return PFC_FAULT;
     }
 
