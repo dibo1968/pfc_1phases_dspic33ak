@@ -59,5 +59,10 @@ slprj/
 *.slx.autosave
 *.asv
 
+# SiL run artifacts from run_sil_scenario.m (bulky results + status logs;
+# the logs are also caught by the *.log rule above, listed here for clarity)
+SimulinkProject/sil_run_*.mat
+SimulinkProject/sil_run_*.log
+
 
 

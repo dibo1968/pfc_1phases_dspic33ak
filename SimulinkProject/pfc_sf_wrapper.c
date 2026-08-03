@@ -31,22 +31,17 @@
 #define u_1_width 1
 #define u_2_width 1
 #define u_3_width 1
+#define u_4_width 4
 #define y_width 1
 #define y_1_width 1
 #define y_2_width 1
-#define y_3_width 1
-#define y_4_width 1
-#define y_5_width 3
-#define y_6_width 3
-#define y_7_width 1
-#define y_8_width 1
 
 /*
  * Create external references here.  
  *
  */
 /* %%%-SFUNWIZ_wrapper_externs_Changes_BEGIN --- EDIT HERE TO _END */
- 
+/* extern double func(double a); */
 /* %%%-SFUNWIZ_wrapper_externs_Changes_END --- EDIT HERE TO _BEGIN */
 
 /*
@@ -72,13 +67,8 @@ extern void pfc_sf_Outputs_wrapper(const real32_T *Vdc_in,
 			const real32_T *Vac_in,
 			const real32_T *Il_in,
 			const real32_T *Iout_in,
-			uint8_T *state_out,
-			uint16_T *fault_status_out,
-			real32_T *test1,
-			real32_T *test2,
+			const real32_T *cfg,
 			real32_T *pwm_fac,
-			real32_T *pfcParam_piVoltage_out,
-			real32_T *pfcParam_piCurrent_out,
 			boolean_T *SiL_Out_PFC_INRUSH_RELAY,
 			PFC_T_Bus *pfcParam_out);
 
@@ -86,13 +76,8 @@ void pfc_sf_Outputs_wrapper(const real32_T *Vdc_in,
 			const real32_T *Vac_in,
 			const real32_T *Il_in,
 			const real32_T *Iout_in,
-			uint8_T *state_out,
-			uint16_T *fault_status_out,
-			real32_T *test1,
-			real32_T *test2,
+			const real32_T *cfg,
 			real32_T *pwm_fac,
-			real32_T *pfcParam_piVoltage_out,
-			real32_T *pfcParam_piCurrent_out,
 			boolean_T *SiL_Out_PFC_INRUSH_RELAY,
 			PFC_T_Bus *pfcParam_out)
 {
@@ -101,6 +86,12 @@ ADCBUF_VDC = Get_ADCBUF_VDC(Vdc_in[0]);
     ADCBUF_PFC_VAC = Get_ADCBUF_VAC(Vac_in[0]);
     ADCBUF_PFC_IL = Get_ADCBUF_PFC_IL(Il_in[0]);
     ADCBUF_PFC_IL2 = Get_ADCBUF_PFC_IL2(Iout_in[0]);
+
+    if (cfg[0] >= 0) pfcParam.dutyFFEnable           = (uint16_t)cfg[0];
+    if (cfg[1] >= 0) pfcParam.sampleCorrectionEnable = (uint16_t)cfg[1];
+    if (cfg[2] >= 0) pfcParam.vdcNotch.enable        = (uint16_t)cfg[2];
+    if (cfg[3] >= 0) pfcParam.loadFF.enable          = (uint16_t)cfg[3];
+
     PFC_ADCInterrupt();
     
     pwm_fac[0] = (float)((PFC_PWM_PDC*1.0f)/(PFC_LOOPTIME_TCY*1.0f));
@@ -110,18 +101,4 @@ ADCBUF_VDC = Get_ADCBUF_VDC(Vdc_in[0]);
 /* %%%-SFUNWIZ_wrapper_Outputs_Changes_END --- EDIT HERE TO _BEGIN */
 }
 
-/*
- * Terminate function
- *
- */
-extern void pfc_sf_Terminate_wrapper(void);
-
-void pfc_sf_Terminate_wrapper(void)
-{
-/* %%%-SFUNWIZ_wrapper_Terminate_Changes_BEGIN --- EDIT HERE TO _END */
-/*
- * Custom Terminate code goes here.
- */
-/* %%%-SFUNWIZ_wrapper_Terminate_Changes_END --- EDIT HERE TO _BEGIN */
-}
 

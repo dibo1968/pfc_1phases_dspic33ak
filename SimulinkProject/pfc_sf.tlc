@@ -1,5 +1,5 @@
 %% File : pfc_sf.tlc
-%% Created : Sun Jul 26 22:08:13 2026
+%% Created : Mon Aug 03 12:10:89 2026
 %%
 %% Description: 
 %%   Simulink Coder wrapper functions interface generated for 
@@ -22,10 +22,8 @@
 %%      generated code.
 %%
 %function BlockTypeSetup(block, system) void
-    %assign uint16Type = LibGetDataTypeNameFromId(::CompiledModel.tSS_UINT16)
     %assign booleanType = LibGetDataTypeNameFromId(::CompiledModel.tSS_BOOLEAN)
     %assign charType = LibGetDataTypeNameFromId(::CompiledModel.tSS_CHAR)
-    %assign uint8Type = LibGetDataTypeNameFromId(::CompiledModel.tSS_UINT8)
     %assign singleType = LibGetDataTypeNameFromId(::CompiledModel.tSS_SINGLE)
 
   %if IsModelReferenceSimTarget() || CodeFormat == "S-Function" || ::isRAccel
@@ -51,16 +49,10 @@
 			const %<singleType> *Vac_in,
 			const %<singleType> *Il_in,
 			const %<singleType> *Iout_in,
-			%<uint8Type> *state_out,
-			%<uint16Type> *fault_status_out,
-			%<singleType> *test1,
-			%<singleType> *test2,
+			const %<singleType> *cfg,
 			%<singleType> *pwm_fac,
-			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out,
 			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
 			void *pfcParam_out, void *__pfcParam_outBUS);
-    SFB_EXTERN_C void pfc_sf_Terminate_wrapper_accel(void);
     #undef SFB_EXTERN_C
     #endif
     %closefile hFile
@@ -92,13 +84,8 @@
 			const %<singleType> *Vac_in,
 			const %<singleType> *Il_in,
 			const %<singleType> *Iout_in,
-			%<uint8Type> *state_out,
-			%<uint16Type> *fault_status_out,
-			%<singleType> *test1,
-			%<singleType> *test2,
+			const %<singleType> *cfg,
 			%<singleType> *pwm_fac,
-			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out,
 			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
 			PFC_T_Bus *pfcParam_out);
     SFB_EXTERN_C void pfc_sf_Terminate_wrapper(void);
@@ -109,34 +96,21 @@
 			const %<singleType> *Vac_in,
 			const %<singleType> *Il_in,
 			const %<singleType> *Iout_in,
-			%<uint8Type> *state_out,
-			%<uint16Type> *fault_status_out,
-			%<singleType> *test1,
-			%<singleType> *test2,
+			const %<singleType> *cfg,
 			%<singleType> *pwm_fac,
-			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out,
 			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
 			void *pfcParam_out, void *__pfcParam_outBUS){
     pfc_sf_Outputs_wrapper(Vdc_in,
 			Vac_in,
 			Il_in,
 			Iout_in,
-			state_out,
-			fault_status_out,
-			test1,
-			test2,
+			cfg,
 			pwm_fac,
-			pfcParam_piVoltage_out,
-			pfcParam_piCurrent_out,
 			SiL_Out_PFC_INRUSH_RELAY,
 			(PFC_T_Bus *) __pfcParam_outBUS);
 
-    %assign dTypeId = LibBlockOutputSignalDataTypeId(8)
+    %assign dTypeId = LibBlockOutputSignalDataTypeId(2)
     %<SLibAssignUserStructToSLStruct(dTypeId, "(%<charType> *) pfcParam_out", "(*(PFC_T_Bus *) __pfcParam_outBUS)",  0)>
-    }
-    void pfc_sf_Terminate_wrapper_accel(void){
-    pfc_sf_Terminate_wrapper();
     }
 #undef SFB_EXTERN_C
 
@@ -159,13 +133,8 @@
 			const %<singleType> *Vac_in,
 			const %<singleType> *Il_in,
 			const %<singleType> *Iout_in,
-			%<uint8Type> *state_out,
-			%<uint16Type> *fault_status_out,
-			%<singleType> *test1,
-			%<singleType> *test2,
+			const %<singleType> *cfg,
 			%<singleType> *pwm_fac,
-			%<singleType> *pfcParam_piVoltage_out,
-			%<singleType> *pfcParam_piCurrent_out,
 			%<booleanType> *SiL_Out_PFC_INRUSH_RELAY,
 			PFC_T_Bus *pfcParam_out);
 
@@ -208,38 +177,21 @@
   %assign pu1 = LibBlockInputSignalAddr(1, "", "", 0)
   %assign pu2 = LibBlockInputSignalAddr(2, "", "", 0)
   %assign pu3 = LibBlockInputSignalAddr(3, "", "", 0)
+  %assign pu4 = LibBlockInputSignalAddr(4, "", "", 0)
   %assign py0 = LibBlockOutputSignalAddr(0, "", "", 0)
   %assign py1 = LibBlockOutputSignalAddr(1, "", "", 0)
   %assign py2 = LibBlockOutputSignalAddr(2, "", "", 0)
-  %assign py3 = LibBlockOutputSignalAddr(3, "", "", 0)
-  %assign py4 = LibBlockOutputSignalAddr(4, "", "", 0)
-  %assign py5 = LibBlockOutputSignalAddr(5, "", "", 0)
-  %assign py6 = LibBlockOutputSignalAddr(6, "", "", 0)
-  %assign py7 = LibBlockOutputSignalAddr(7, "", "", 0)
-  %assign py8 = LibBlockOutputSignalAddr(8, "", "", 0)
   
   %if IsModelReferenceSimTarget() || CodeFormat == "S-Function" || ::isRAccel
     %assign pfcParam_outBUS_ptr = LibBlockDWorkAddr(pfcParam_outBUS, "", "", 0)
-    pfc_sf_Outputs_wrapper_accel(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<py0>, %<py1>, %<py2>, %<py3>, %<py4>, %<py5>, %<py6>, %<py7>, %<py8>, %<pfcParam_outBUS_ptr>);
+    pfc_sf_Outputs_wrapper_accel(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<pu4>, %<py0>, %<py1>, %<py2>, %<pfcParam_outBUS_ptr>);
   %else
-    pfc_sf_Outputs_wrapper(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<py0>, %<py1>, %<py2>, %<py3>, %<py4>, %<py5>, %<py6>, %<py7>, %<py8>);
+    pfc_sf_Outputs_wrapper(%<pu0>, %<pu1>, %<pu2>, %<pu3>, %<pu4>, %<py0>, %<py1>, %<py2>);
   %endif
 
   %%
 %endfunction
 
-%% Function: Terminate ========================================================
-%%
-%function Terminate(block, system) Output
-   /* %<Type> Block: %<Name> */
-  
-  %if IsModelReferenceSimTarget() || CodeFormat == "S-Function" || ::isRAccel
-    pfc_sf_Terminate_wrapper_accel();
-  %else
-    pfc_sf_Terminate_wrapper();
-  %endif
-
-%endfunction
 
 %% [EOF] pfc_sf.tlc
 

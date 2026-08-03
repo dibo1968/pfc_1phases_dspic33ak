@@ -26,7 +26,7 @@
  * | See matlabroot/simulink/src/sfuntmpl_doc.c for a more detailed template |
  *  -------------------------------------------------------------------------
  *
- * Created: Sun Jul 26 22:08:13 2026
+ * Created: Mon Aug 03 12:10:89 2026
  */
 
 #define S_FUNCTION_LEVEL               2
@@ -34,7 +34,7 @@
 
 /*<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 /* %%%-SFUNWIZ_defines_Changes_BEGIN --- EDIT HERE TO _END */
-#define NUM_INPUTS                     4
+#define NUM_INPUTS                     5
 
 /* Input Port  0 */
 #define IN_PORT_0_NAME                 Vdc_in
@@ -115,15 +115,35 @@
 #define IN_3_FRACTIONLENGTH            3
 #define IN_3_BIAS                      0
 #define IN_3_SLOPE                     0.125
-#define NUM_OUTPUTS                    9
+
+/* Input Port  4 */
+#define IN_PORT_4_NAME                 cfg
+#define INPUT_4_DIMS_ND                {1,4}
+#define INPUT_4_NUM_ELEMS              4
+#define INPUT_4_WIDTH                  1
+#define INPUT_DIMS_4_COL               4
+#define INPUT_4_DTYPE                  real32_T
+#define INPUT_4_COMPLEX                COMPLEX_NO
+#define INPUT_4_UNIT                   ""
+#define IN_4_BUS_BASED                 0
+#define IN_4_BUS_NAME
+#define IN_4_DIMS                      2-D
+#define INPUT_4_FEEDTHROUGH            1
+#define IN_4_ISSIGNED                  1
+#define IN_4_WORDLENGTH                8
+#define IN_4_FIXPOINTSCALING           1
+#define IN_4_FRACTIONLENGTH            3
+#define IN_4_BIAS                      0
+#define IN_4_SLOPE                     0.125
+#define NUM_OUTPUTS                    3
 
 /* Output Port  0 */
-#define OUT_PORT_0_NAME                state_out
+#define OUT_PORT_0_NAME                pwm_fac
 #define OUTPUT_0_DIMS_ND               {1,1}
 #define OUTPUT_0_NUM_ELEMS             1
 #define OUTPUT_0_WIDTH                 1
 #define OUTPUT_DIMS_0_COL              1
-#define OUTPUT_0_DTYPE                 uint8_T
+#define OUTPUT_0_DTYPE                 real32_T
 #define OUTPUT_0_COMPLEX               COMPLEX_NO
 #define OUTPUT_0_UNIT                  ""
 #define OUT_0_BUS_BASED                0
@@ -137,12 +157,12 @@
 #define OUT_0_SLOPE                    0.125
 
 /* Output Port  1 */
-#define OUT_PORT_1_NAME                fault_status_out
+#define OUT_PORT_1_NAME                SiL_Out_PFC_INRUSH_RELAY
 #define OUTPUT_1_DIMS_ND               {1,1}
 #define OUTPUT_1_NUM_ELEMS             1
 #define OUTPUT_1_WIDTH                 1
 #define OUTPUT_DIMS_1_COL              1
-#define OUTPUT_1_DTYPE                 uint16_T
+#define OUTPUT_1_DTYPE                 boolean_T
 #define OUTPUT_1_COMPLEX               COMPLEX_NO
 #define OUTPUT_1_UNIT                  ""
 #define OUT_1_BUS_BASED                0
@@ -156,16 +176,16 @@
 #define OUT_1_SLOPE                    0.125
 
 /* Output Port  2 */
-#define OUT_PORT_2_NAME                test1
+#define OUT_PORT_2_NAME                pfcParam_out
 #define OUTPUT_2_DIMS_ND               {1,1}
 #define OUTPUT_2_NUM_ELEMS             1
 #define OUTPUT_2_WIDTH                 1
 #define OUTPUT_DIMS_2_COL              1
-#define OUTPUT_2_DTYPE                 real32_T
+#define OUTPUT_2_DTYPE                 Bus:PFC_Bus
 #define OUTPUT_2_COMPLEX               COMPLEX_NO
 #define OUTPUT_2_UNIT                  ""
-#define OUT_2_BUS_BASED                0
-#define OUT_2_BUS_NAME
+#define OUT_2_BUS_BASED                1
+#define OUT_2_BUS_NAME                 PFC_T_Bus
 #define OUT_2_DIMS                     1-D
 #define OUT_2_ISSIGNED                 1
 #define OUT_2_WORDLENGTH               8
@@ -173,120 +193,6 @@
 #define OUT_2_FRACTIONLENGTH           3
 #define OUT_2_BIAS                     0
 #define OUT_2_SLOPE                    0.125
-
-/* Output Port  3 */
-#define OUT_PORT_3_NAME                test2
-#define OUTPUT_3_DIMS_ND               {1,1}
-#define OUTPUT_3_NUM_ELEMS             1
-#define OUTPUT_3_WIDTH                 1
-#define OUTPUT_DIMS_3_COL              1
-#define OUTPUT_3_DTYPE                 real32_T
-#define OUTPUT_3_COMPLEX               COMPLEX_NO
-#define OUTPUT_3_UNIT                  ""
-#define OUT_3_BUS_BASED                0
-#define OUT_3_BUS_NAME
-#define OUT_3_DIMS                     1-D
-#define OUT_3_ISSIGNED                 1
-#define OUT_3_WORDLENGTH               8
-#define OUT_3_FIXPOINTSCALING          1
-#define OUT_3_FRACTIONLENGTH           3
-#define OUT_3_BIAS                     0
-#define OUT_3_SLOPE                    0.125
-
-/* Output Port  4 */
-#define OUT_PORT_4_NAME                pwm_fac
-#define OUTPUT_4_DIMS_ND               {1,1}
-#define OUTPUT_4_NUM_ELEMS             1
-#define OUTPUT_4_WIDTH                 1
-#define OUTPUT_DIMS_4_COL              1
-#define OUTPUT_4_DTYPE                 real32_T
-#define OUTPUT_4_COMPLEX               COMPLEX_NO
-#define OUTPUT_4_UNIT                  ""
-#define OUT_4_BUS_BASED                0
-#define OUT_4_BUS_NAME
-#define OUT_4_DIMS                     1-D
-#define OUT_4_ISSIGNED                 1
-#define OUT_4_WORDLENGTH               8
-#define OUT_4_FIXPOINTSCALING          1
-#define OUT_4_FRACTIONLENGTH           3
-#define OUT_4_BIAS                     0
-#define OUT_4_SLOPE                    0.125
-
-/* Output Port  5 */
-#define OUT_PORT_5_NAME                pfcParam_piVoltage_out
-#define OUTPUT_5_DIMS_ND               {1,3}
-#define OUTPUT_5_NUM_ELEMS             3
-#define OUTPUT_5_WIDTH                 1
-#define OUTPUT_DIMS_5_COL              3
-#define OUTPUT_5_DTYPE                 real32_T
-#define OUTPUT_5_COMPLEX               COMPLEX_NO
-#define OUTPUT_5_UNIT                  ""
-#define OUT_5_BUS_BASED                0
-#define OUT_5_BUS_NAME
-#define OUT_5_DIMS                     2-D
-#define OUT_5_ISSIGNED                 1
-#define OUT_5_WORDLENGTH               8
-#define OUT_5_FIXPOINTSCALING          1
-#define OUT_5_FRACTIONLENGTH           3
-#define OUT_5_BIAS                     0
-#define OUT_5_SLOPE                    0.125
-
-/* Output Port  6 */
-#define OUT_PORT_6_NAME                pfcParam_piCurrent_out
-#define OUTPUT_6_DIMS_ND               {1,3}
-#define OUTPUT_6_NUM_ELEMS             3
-#define OUTPUT_6_WIDTH                 1
-#define OUTPUT_DIMS_6_COL              3
-#define OUTPUT_6_DTYPE                 real32_T
-#define OUTPUT_6_COMPLEX               COMPLEX_NO
-#define OUTPUT_6_UNIT                  ""
-#define OUT_6_BUS_BASED                0
-#define OUT_6_BUS_NAME
-#define OUT_6_DIMS                     2-D
-#define OUT_6_ISSIGNED                 1
-#define OUT_6_WORDLENGTH               8
-#define OUT_6_FIXPOINTSCALING          1
-#define OUT_6_FRACTIONLENGTH           3
-#define OUT_6_BIAS                     0
-#define OUT_6_SLOPE                    0.125
-
-/* Output Port  7 */
-#define OUT_PORT_7_NAME                SiL_Out_PFC_INRUSH_RELAY
-#define OUTPUT_7_DIMS_ND               {1,1}
-#define OUTPUT_7_NUM_ELEMS             1
-#define OUTPUT_7_WIDTH                 1
-#define OUTPUT_DIMS_7_COL              1
-#define OUTPUT_7_DTYPE                 boolean_T
-#define OUTPUT_7_COMPLEX               COMPLEX_NO
-#define OUTPUT_7_UNIT                  ""
-#define OUT_7_BUS_BASED                0
-#define OUT_7_BUS_NAME
-#define OUT_7_DIMS                     1-D
-#define OUT_7_ISSIGNED                 1
-#define OUT_7_WORDLENGTH               8
-#define OUT_7_FIXPOINTSCALING          1
-#define OUT_7_FRACTIONLENGTH           3
-#define OUT_7_BIAS                     0
-#define OUT_7_SLOPE                    0.125
-
-/* Output Port  8 */
-#define OUT_PORT_8_NAME                pfcParam_out
-#define OUTPUT_8_DIMS_ND               {1,1}
-#define OUTPUT_8_NUM_ELEMS             1
-#define OUTPUT_8_WIDTH                 1
-#define OUTPUT_DIMS_8_COL              1
-#define OUTPUT_8_DTYPE                 Bus:PFC_Bus
-#define OUTPUT_8_COMPLEX               COMPLEX_NO
-#define OUTPUT_8_UNIT                  ""
-#define OUT_8_BUS_BASED                1
-#define OUT_8_BUS_NAME                 PFC_T_Bus
-#define OUT_8_DIMS                     1-D
-#define OUT_8_ISSIGNED                 1
-#define OUT_8_WORDLENGTH               8
-#define OUT_8_FIXPOINTSCALING          1
-#define OUT_8_FRACTIONLENGTH           3
-#define OUT_8_BIAS                     0
-#define OUT_8_SLOPE                    0.125
 #define NPARAMS                        0
 #define SAMPLE_TIME_0                  INHERITED_SAMPLE_TIME
 #define NUM_DISC_STATES                0
@@ -329,16 +235,10 @@ extern void pfc_sf_Outputs_wrapper(const real32_T *Vdc_in,
   const real32_T *Vac_in,
   const real32_T *Il_in,
   const real32_T *Iout_in,
-  uint8_T *state_out,
-  uint16_T *fault_status_out,
-  real32_T *test1,
-  real32_T *test2,
+  const real32_T *cfg,
   real32_T *pwm_fac,
-  real32_T *pfcParam_piVoltage_out,
-  real32_T *pfcParam_piCurrent_out,
   boolean_T *SiL_Out_PFC_INRUSH_RELAY,
   PFC_T_Bus *pfcParam_out);
-extern void pfc_sf_Terminate_wrapper(void);
 
 /*====================*
  * S-function methods *
@@ -349,7 +249,7 @@ extern void pfc_sf_Terminate_wrapper(void);
  */
 static void mdlInitializeSizes(SimStruct *S)
 {
-  DECL_AND_INIT_DIMSINFO(outputDimsInfo);
+  DECL_AND_INIT_DIMSINFO(inputDimsInfo);
   ssSetNumSFcnParams(S, NPARAMS);
   if (ssGetNumSFcnParams(S) != ssGetSFcnParamsCount(S)) {
     return;                            /* Parameter mismatch will be reported by Simulink */
@@ -389,6 +289,18 @@ static void mdlInitializeSizes(SimStruct *S)
   ssSetInputPortComplexSignal(S, 3, INPUT_3_COMPLEX);
   ssSetInputPortDirectFeedThrough(S, 3, INPUT_3_FEEDTHROUGH);
   ssSetInputPortRequiredContiguous(S, 3, 1);/*direct input signal access*/
+
+  /* Input Port 4 */
+  ssAllowSignalsWithMoreThan2D(S);
+  inputDimsInfo.numDims = 2;
+  inputDimsInfo.width = INPUT_4_NUM_ELEMS;
+  int_T in4Dims[] = INPUT_4_DIMS_ND;
+  inputDimsInfo.dims = in4Dims;
+  ssSetInputPortDimensionInfo(S, 4, &inputDimsInfo);
+  ssSetInputPortDataType(S, 4, SS_SINGLE);
+  ssSetInputPortComplexSignal(S, 4, INPUT_4_COMPLEX);
+  ssSetInputPortDirectFeedThrough(S, 4, INPUT_4_FEEDTHROUGH);
+  ssSetInputPortRequiredContiguous(S, 4, 1);/*direct input signal access*/
 
   /*
    * Configure the Units for Input Ports
@@ -434,6 +346,15 @@ static void mdlInitializeSizes(SimStruct *S)
       return;
     }
 
+    ssRegisterUnitFromExpr(S, INPUT_4_UNIT, &inUnitIdReg);
+    if (inUnitIdReg != INVALID_UNIT_ID) {
+      ssSetInputPortUnit(S, 4, inUnitIdReg);
+    } else {
+      ssSetLocalErrorStatus(S,
+                            "Invalid Unit provided for input port cfg of S-Function pfc_sf");
+      return;
+    }
+
 #endif
 
   }
@@ -443,56 +364,17 @@ static void mdlInitializeSizes(SimStruct *S)
 
   /* Output Port 0 */
   ssSetOutputPortWidth(S, 0, OUTPUT_0_NUM_ELEMS);
-  ssSetOutputPortDataType(S, 0, SS_UINT8);
+  ssSetOutputPortDataType(S, 0, SS_SINGLE);
   ssSetOutputPortComplexSignal(S, 0, OUTPUT_0_COMPLEX);
 
   /* Output Port 1 */
   ssSetOutputPortWidth(S, 1, OUTPUT_1_NUM_ELEMS);
-  ssSetOutputPortDataType(S, 1, SS_UINT16);
+  ssSetOutputPortDataType(S, 1, SS_BOOLEAN);
   ssSetOutputPortComplexSignal(S, 1, OUTPUT_1_COMPLEX);
 
   /* Output Port 2 */
-  ssSetOutputPortWidth(S, 2, OUTPUT_2_NUM_ELEMS);
-  ssSetOutputPortDataType(S, 2, SS_SINGLE);
-  ssSetOutputPortComplexSignal(S, 2, OUTPUT_2_COMPLEX);
 
-  /* Output Port 3 */
-  ssSetOutputPortWidth(S, 3, OUTPUT_3_NUM_ELEMS);
-  ssSetOutputPortDataType(S, 3, SS_SINGLE);
-  ssSetOutputPortComplexSignal(S, 3, OUTPUT_3_COMPLEX);
-
-  /* Output Port 4 */
-  ssSetOutputPortWidth(S, 4, OUTPUT_4_NUM_ELEMS);
-  ssSetOutputPortDataType(S, 4, SS_SINGLE);
-  ssSetOutputPortComplexSignal(S, 4, OUTPUT_4_COMPLEX);
-
-  /* Output Port 5 */
-  ssAllowSignalsWithMoreThan2D(S);
-  outputDimsInfo.numDims = 2;
-  outputDimsInfo.width = OUTPUT_5_NUM_ELEMS;
-  int_T out5Dims[] = OUTPUT_5_DIMS_ND;
-  outputDimsInfo.dims = out5Dims;
-  ssSetOutputPortDimensionInfo(S, 5, &outputDimsInfo);
-  ssSetOutputPortDataType(S, 5, SS_SINGLE);
-  ssSetOutputPortComplexSignal(S, 5, OUTPUT_5_COMPLEX);
-
-  /* Output Port 6 */
-  outputDimsInfo.numDims = 2;
-  outputDimsInfo.width = OUTPUT_6_NUM_ELEMS;
-  int_T out6Dims[] = OUTPUT_6_DIMS_ND;
-  outputDimsInfo.dims = out6Dims;
-  ssSetOutputPortDimensionInfo(S, 6, &outputDimsInfo);
-  ssSetOutputPortDataType(S, 6, SS_SINGLE);
-  ssSetOutputPortComplexSignal(S, 6, OUTPUT_6_COMPLEX);
-
-  /* Output Port 7 */
-  ssSetOutputPortWidth(S, 7, OUTPUT_7_NUM_ELEMS);
-  ssSetOutputPortDataType(S, 7, SS_BOOLEAN);
-  ssSetOutputPortComplexSignal(S, 7, OUTPUT_7_COMPLEX);
-
-  /* Output Port 8 */
-
-  /* Register PFC_T_Bus datatype for Output port 8 */
+  /* Register PFC_T_Bus datatype for Output port 2 */
 #if defined(MATLAB_MEX_FILE)
 
   if (ssGetSimMode(S) != SS_SIMMODE_SIZES_CALL_ONLY) {
@@ -500,16 +382,16 @@ static void mdlInitializeSizes(SimStruct *S)
     ssRegisterTypeFromNamedObject(S, "PFC_T_Bus", &dataTypeIdReg);
     if (dataTypeIdReg == INVALID_DTYPE_ID)
       return;
-    ssSetOutputPortDataType(S, 8, dataTypeIdReg);
+    ssSetOutputPortDataType(S, 2, dataTypeIdReg);
   }
 
 #endif
 
-  ssSetOutputPortWidth(S, 8, OUTPUT_8_NUM_ELEMS);
-  ssSetBusOutputObjectName(S, 8, (void *) "PFC_T_Bus");
-  ssSetOutputPortComplexSignal(S, 8, OUTPUT_8_COMPLEX);
-  ssSetBusOutputAsStruct(S, 8,OUT_8_BUS_BASED);
-  ssSetOutputPortBusMode(S, 8, SL_BUS_MODE);
+  ssSetOutputPortWidth(S, 2, OUTPUT_2_NUM_ELEMS);
+  ssSetBusOutputObjectName(S, 2, (void *) "PFC_T_Bus");
+  ssSetOutputPortComplexSignal(S, 2, OUTPUT_2_COMPLEX);
+  ssSetBusOutputAsStruct(S, 2,OUT_2_BUS_BASED);
+  ssSetOutputPortBusMode(S, 2, SL_BUS_MODE);
 
   /*
    * Configure the Units for Output Ports
@@ -524,7 +406,7 @@ static void mdlInitializeSizes(SimStruct *S)
       ssSetOutputPortUnit(S, 0, outUnitIdReg);
     } else {
       ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port state_out of S-Function pfc_sf");
+                            "Invalid Unit provided for output port pwm_fac of S-Function pfc_sf");
       return;
     }
 
@@ -533,67 +415,13 @@ static void mdlInitializeSizes(SimStruct *S)
       ssSetOutputPortUnit(S, 1, outUnitIdReg);
     } else {
       ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port fault_status_out of S-Function pfc_sf");
+                            "Invalid Unit provided for output port SiL_Out_PFC_INRUSH_RELAY of S-Function pfc_sf");
       return;
     }
 
     ssRegisterUnitFromExpr(S, OUTPUT_2_UNIT, &outUnitIdReg);
     if (outUnitIdReg != INVALID_UNIT_ID) {
       ssSetOutputPortUnit(S, 2, outUnitIdReg);
-    } else {
-      ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port test1 of S-Function pfc_sf");
-      return;
-    }
-
-    ssRegisterUnitFromExpr(S, OUTPUT_3_UNIT, &outUnitIdReg);
-    if (outUnitIdReg != INVALID_UNIT_ID) {
-      ssSetOutputPortUnit(S, 3, outUnitIdReg);
-    } else {
-      ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port test2 of S-Function pfc_sf");
-      return;
-    }
-
-    ssRegisterUnitFromExpr(S, OUTPUT_4_UNIT, &outUnitIdReg);
-    if (outUnitIdReg != INVALID_UNIT_ID) {
-      ssSetOutputPortUnit(S, 4, outUnitIdReg);
-    } else {
-      ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port pwm_fac of S-Function pfc_sf");
-      return;
-    }
-
-    ssRegisterUnitFromExpr(S, OUTPUT_5_UNIT, &outUnitIdReg);
-    if (outUnitIdReg != INVALID_UNIT_ID) {
-      ssSetOutputPortUnit(S, 5, outUnitIdReg);
-    } else {
-      ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port pfcParam_piVoltage_out of S-Function pfc_sf");
-      return;
-    }
-
-    ssRegisterUnitFromExpr(S, OUTPUT_6_UNIT, &outUnitIdReg);
-    if (outUnitIdReg != INVALID_UNIT_ID) {
-      ssSetOutputPortUnit(S, 6, outUnitIdReg);
-    } else {
-      ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port pfcParam_piCurrent_out of S-Function pfc_sf");
-      return;
-    }
-
-    ssRegisterUnitFromExpr(S, OUTPUT_7_UNIT, &outUnitIdReg);
-    if (outUnitIdReg != INVALID_UNIT_ID) {
-      ssSetOutputPortUnit(S, 7, outUnitIdReg);
-    } else {
-      ssSetLocalErrorStatus(S,
-                            "Invalid Unit provided for output port SiL_Out_PFC_INRUSH_RELAY of S-Function pfc_sf");
-      return;
-    }
-
-    ssRegisterUnitFromExpr(S, OUTPUT_8_UNIT, &outUnitIdReg);
-    if (outUnitIdReg != INVALID_UNIT_ID) {
-      ssSetOutputPortUnit(S, 8, outUnitIdReg);
     } else {
       ssSetLocalErrorStatus(S,
                             "Invalid Unit provided for output port pfcParam_out of S-Function pfc_sf");
@@ -690,22 +518,14 @@ static void mdlSetDefaultPortDimensionInfo(SimStruct *S)
   DECL_AND_INIT_DIMSINFO(portDimsInfo);
   int_T dims[2];
 
-  /* Setting default dimensions for output port 5 */
-  portDimsInfo.width = OUTPUT_5_NUM_ELEMS;
-  dims[0] = OUTPUT_5_NUM_ELEMS;
+  /* Setting default dimensions for input port 4 */
+  portDimsInfo.width = INPUT_4_NUM_ELEMS;
+  dims[0] = INPUT_4_NUM_ELEMS;
   dims[1] = 1;
+  portDimsInfo.dims = dims;
   portDimsInfo.numDims = 2;
-  if (ssGetOutputPortNumDimensions(S, 5) == (-1)) {
-    ssSetOutputPortDimensionInfo(S, 5, &portDimsInfo);
-  }
-
-  /* Setting default dimensions for output port 6 */
-  portDimsInfo.width = OUTPUT_6_NUM_ELEMS;
-  dims[0] = OUTPUT_6_NUM_ELEMS;
-  dims[1] = 1;
-  portDimsInfo.numDims = 2;
-  if (ssGetOutputPortNumDimensions(S, 6) == (-1)) {
-    ssSetOutputPortDimensionInfo(S, 6, &portDimsInfo);
+  if (ssGetInputPortWidth(S, 4) == DYNAMICALLY_SIZED) {
+    ssSetInputPortMatrixDimensions(S, 4, 1 , 1);
   }
 
   return;
@@ -752,7 +572,7 @@ static void mdlSetWorkWidths(SimStruct *S)
   /* Set the width of DWork(s) used for marshalling the IOs */
   if (isBusDWorkPresent) {
     /* Update dwork 0 */
-    ssSetDWorkWidth(S, 0, ssGetOutputPortWidth(S, 8));
+    ssSetDWorkWidth(S, 0, ssGetOutputPortWidth(S, 2));
   } else {
     ssSetDWorkWidth(S, 0, 1);
   }
@@ -1044,7 +864,7 @@ static void mdlStart(SimStruct *S)
   busInfo[95].elemSize = dtaGetDataTypeSize(dta, bpath, SS_UINT16);
   busInfo[95].numElems = 1;
   busInfo[96].elemSize = dtaGetDataTypeSize(dta, bpath, PFC_T_BusId);
-  busInfo[96].numElems = ssGetOutputPortWidth(S, 8);
+  busInfo[96].numElems = ssGetOutputPortWidth(S, 2);
   ssSetUserData(S, busInfo);
 
   /* Allocate memory for arrays or nested arrays of buses DWork pointers */
@@ -1062,16 +882,11 @@ static void mdlOutputs(SimStruct *S, int_T tid)
   const real32_T *Vac_in = (real32_T *) ssGetInputPortRealSignal(S, 1);
   const real32_T *Il_in = (real32_T *) ssGetInputPortRealSignal(S, 2);
   const real32_T *Iout_in = (real32_T *) ssGetInputPortRealSignal(S, 3);
-  uint8_T *state_out = (uint8_T *) ssGetOutputPortRealSignal(S, 0);
-  uint16_T *fault_status_out = (uint16_T *) ssGetOutputPortRealSignal(S, 1);
-  real32_T *test1 = (real32_T *) ssGetOutputPortRealSignal(S, 2);
-  real32_T *test2 = (real32_T *) ssGetOutputPortRealSignal(S, 3);
-  real32_T *pwm_fac = (real32_T *) ssGetOutputPortRealSignal(S, 4);
-  real32_T *pfcParam_piVoltage_out = (real32_T *) ssGetOutputPortRealSignal(S, 5);
-  real32_T *pfcParam_piCurrent_out = (real32_T *) ssGetOutputPortRealSignal(S, 6);
+  const real32_T *cfg = (real32_T *) ssGetInputPortRealSignal(S, 4);
+  real32_T *pwm_fac = (real32_T *) ssGetOutputPortRealSignal(S, 0);
   boolean_T *SiL_Out_PFC_INRUSH_RELAY = (boolean_T *) ssGetOutputPortRealSignal
-    (S, 7);
-  char *pfcParam_out = (char *) ssGetOutputPortSignal(S, 8);
+    (S, 1);
+  char *pfcParam_out = (char *) ssGetOutputPortSignal(S, 2);
   busInfoStruct* busInfo = (busInfoStruct *) ssGetUserData(S);
 
   /* Temporary bus copy declarations */
@@ -1080,13 +895,12 @@ static void mdlOutputs(SimStruct *S, int_T tid)
   const char *bpath = ssGetPath(S);
 
   /*Copy from Simulink to bus structure*/
-  pfc_sf_Outputs_wrapper(Vdc_in, Vac_in, Il_in, Iout_in, state_out,
-    fault_status_out, test1, test2, pwm_fac, pfcParam_piVoltage_out,
-    pfcParam_piCurrent_out, SiL_Out_PFC_INRUSH_RELAY, &_pfcParam_outBUS);
+  pfc_sf_Outputs_wrapper(Vdc_in, Vac_in, Il_in, Iout_in, cfg, pwm_fac,
+    SiL_Out_PFC_INRUSH_RELAY, &_pfcParam_outBUS);
 
   /*Copy from bus structure to Simulink*/
 
-  /*Copy from _pfcParam_outBUS to Simulink for Output port 8*/
+  /*Copy from _pfcParam_outBUS to Simulink for Output port 2*/
   *((uint32_T*)((char *) pfcParam_out + busInfo[0].offset)) = (_pfcParam_outBUS)
     .duty;
   *((uint16_T*)((char *) pfcParam_out + busInfo[1].offset)) = (_pfcParam_outBUS)
@@ -1271,8 +1085,6 @@ static void mdlOutputs(SimStruct *S, int_T tid)
  */
 static void mdlTerminate(SimStruct *S)
 {
-  pfc_sf_Terminate_wrapper();
-
   /* Free stored bus information */
   busInfoStruct *busInfo = (busInfoStruct *) ssGetUserData(S);
   if (busInfo != NULL) {
