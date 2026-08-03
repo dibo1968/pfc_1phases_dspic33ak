@@ -247,7 +247,7 @@ SimulationsProfiles = {
         'output-impedance-probe' 230 struct('SimCfg',[-1;-1;-1;0])
 };
 
-SimIndex = 12;
+SimIndex = 1;
 
 SimTime     = SimulationsProfiles{SimIndex, 1};
 SimLoadTime = SimulationsProfiles{SimIndex, 2};
