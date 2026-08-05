@@ -58,7 +58,15 @@ Vac_TimePeriod  = 1/Vac_Frequency;  % s   // line period
 Vac_Samples     = Vac_TimePeriod/T_pwm;  % ADC samples per line period
                                          % = PFC_INPUT_FREQUENCY_COUNTER (1280)
 
-L = 680e-6;                         % H   // boost inductor, = PFC_INDUCTANCE
+% two options are available for the inductor: a constant value and a nonlinear value
+VAR_L_CONST  = Simulink.VariantExpression('INDUCTOR_MODEL == InductorModel.Constant');
+L = 584e-6;% H   // boost inductor, = PFC_INDUCTANCE
+
+VAR_L_NONLIN = Simulink.VariantExpression('INDUCTOR_MODEL == InductorModel.Nonlinear');
+load("param\WE_760800203_L_vs_I_table.mat");
+
+INDUCTOR_MODEL = InductorModel.Constant;
+
 C = 3*470e-6;                       % F   // bus capacitance (3 x 470 uF)
 R = (Vout^2)/Po;                    % ohm // equivalent full-load resistance
 
